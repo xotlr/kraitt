@@ -1,27 +1,151 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-canvas: #0a0a0a;
+  --color-canvas-elevated: #131312;
+  --color-ink: #f5f1ea;
+  --color-ink-muted: #a8a39a;
+  --color-ink-faint: #5c5852;
+  --color-hairline: #1f1d1a;
+  --color-hairline-hover: #2e2a25;
+  --color-amber: #e8a87c;
+  --color-amber-dim: #b8845c;
+  --color-amber-glow: rgba(232, 168, 124, 0.18);
+
+  --font-display: var(--font-display), ui-serif, Georgia, serif;
+  --font-mono: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Fluid type scale — tightened a stop versus v1 so display isn't overpowering */
+  --text-display: clamp(3rem, 1.8rem + 5.5vw, 9.5rem);
+  --text-display--line-height: 0.92;
+  --text-h1: clamp(2rem, 1.4rem + 2.8vw, 4.5rem);
+  --text-h1--line-height: 0.98;
+  --text-h2: clamp(1.625rem, 1.2rem + 1.6vw, 2.5rem);
+  --text-h2--line-height: 1.1;
+  --text-body-lg: clamp(1.0625rem, 1rem + 0.3vw, 1.25rem);
+  --text-body-lg--line-height: 1.6;
+  --text-eyebrow: 10px;
+
+  --tracking-tighter: -0.03em;
+  --tracking-tight: -0.015em;
+  --tracking-eyebrow: 0.2em;
+  --tracking-wide: 0.25em;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Spacing scale lives in @theme for tokenization but only --color/--text/
+     --tracking/--ease are auto-emitted as CSS variables. Re-declare on :root
+     below so utilities like var(--gutter) actually resolve. */
 }
 
-@media (prefers-color-scheme: dark) {
+:root {
+  --container-max: 1280px;
+  --space-section: clamp(7rem, 4rem + 12vw, 14rem);
+  --space-section-sm: clamp(4rem, 2.5rem + 6vw, 8rem);
+  --gutter: clamp(1.5rem, 1rem + 2vw, 4rem);
+}
+
+@keyframes string-glow {
+  0%, 100% { opacity: 0.18; }
+  50% { opacity: 0.32; }
+}
+
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    color-scheme: dark;
+  }
+
+  html {
+    background: var(--color-canvas);
+  }
+
+  html,
+  body {
+    color: var(--color-ink);
+    font-family: var(--font-display), ui-serif, Georgia, serif;
+    font-weight: 300;
+    font-feature-settings: "kern", "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background: transparent;
+  }
+
+  ::selection {
+    background: var(--color-amber);
+    color: var(--color-canvas);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
 @layer utilities {
+  .font-display {
+    font-family: var(--font-display), ui-serif, Georgia, serif;
+    font-variation-settings: "opsz" 144, "SOFT" 30, "WONK" 0;
+  }
+  .font-display-thin {
+    font-family: var(--font-display), ui-serif, Georgia, serif;
+    font-variation-settings: "opsz" 144, "SOFT" 0, "WONK" 0;
+    font-weight: 200;
+  }
+  .font-mono {
+    font-family: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  }
   .text-balance {
     text-wrap: balance;
+  }
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  /* Vignette overlay sits between the WebGL scene and content. The grain
+     itself lives inside the WebGL atmosphere shader so it composites with
+     bloom + tonemapping. Here we only darken the corners so the type sits
+     in a deeper pocket. */
+  .atmos::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background: radial-gradient(
+      ellipse 75% 70% at center,
+      transparent 0%,
+      rgba(0, 0, 0, 0.3) 65%,
+      rgba(0, 0, 0, 0.65) 100%
+    );
+  }
+
+  .container-edge {
+    padding-inline: var(--gutter);
+    max-width: var(--container-max);
+    margin-inline: auto;
+    width: 100%;
+  }
+
+  .hairline {
+    border-color: var(--color-hairline);
+  }
+
+  /* Eyebrow line — mono label with hairline before it */
+  .eyebrow {
+    font-family: var(--font-mono), monospace;
+    font-size: 10px;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--color-ink-muted);
   }
 }
