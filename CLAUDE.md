@@ -126,3 +126,19 @@ src/
 - `bun dev` — http://localhost:3000
 - `bun run build` — production build (Turbopack)
 - `bunx tsc --noEmit` — typecheck
+
+## Pre-deploy checklist
+
+**Audio asset is unlicensed.** `/public/audio/ambient.mp3` is currently
+expected to be a track from the *Clair Obscur: Expedition 33* OST
+("Une Vie à t'Aimer"), used as a development-only placeholder. This is
+© Sandfall Interactive / Lorien Testard. **It MUST be replaced before
+any public deploy** with either:
+
+- a public-domain recording (e.g. IMSLP performance-PD entries), or
+- a properly licensed track (paid commercial license or CC-BY with
+  attribution rendered somewhere on the site), or
+- silence — remove the music toggle entirely, keep only the mic input
+
+The file is referenced from `src/lib/audio.tsx` (see the `MUSIC_SRC`
+constant and the comment immediately above it).

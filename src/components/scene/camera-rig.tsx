@@ -6,29 +6,24 @@ import * as THREE from "three";
 import { useScrollViewport } from "@/lib/scroll-context";
 
 /**
- * Scroll-driven camera. Reads progress from the ScrollArea viewport
- * (not window) and lerps the default camera between two poses:
+ * Scroll-driven camera dolly. As the user scrolls down the page, the
+ * camera walks forward into the landscape (and rises slightly), so
+ * the visitor genuinely traverses the terrain rather than watching
+ * it morph in place. Reads scroll from the ScrollArea viewport via
+ * the same context the rest of the scroll-linked code uses.
  *
- *   Top (progress = 0):
- *     position (0, 0.4, 1.2), look at (0, 0, 0)
- *     camera is low and close to the front of the string field, looking
- *     slightly down at the strings near the front
+ * Path:
+ *   scroll = 0:    (0, 0.8, 3.5)  looking at (0, -0.2, -2.5)
+ *   scroll = 1:    (0, 1.6, -2.0) looking at (0, -0.4, -8.0)
  *
- *   Bottom (progress = 1):
- *     position (0, 2.5, 5.0), look at (0, 0, -2)
- *     camera has dollied back and risen, tilted up so the horizon rises
- *     and the field stretches into the distance
- *
- * The actual camera state is the smoothed value of `currentProgress`,
- * which trails `targetProgress` with a low-pass filter for buttery feel.
- *
- * Mounts inside the Canvas (so useThree/useFrame work). It doesn't
- * render anything — pure side-effect on the camera.
+ * Camera walks forward ~5.5 wu and rises ~0.8 wu over the full page
+ * scroll. The lookAt target moves with it so the camera doesn't
+ * pivot, just translates — feels like steady forward motion.
  */
-const TOP_POS = new THREE.Vector3(0, 0.4, 1.2);
-const BOTTOM_POS = new THREE.Vector3(0, 2.5, 5.0);
-const TOP_LOOK = new THREE.Vector3(0, 0, 0);
-const BOTTOM_LOOK = new THREE.Vector3(0, 0, -2);
+const TOP_POS = new THREE.Vector3(0, 0.8, 3.5);
+const BOTTOM_POS = new THREE.Vector3(0, 1.6, -2.0);
+const TOP_LOOK = new THREE.Vector3(0, -0.2, -2.5);
+const BOTTOM_LOOK = new THREE.Vector3(0, -0.4, -8.0);
 
 export function CameraRig() {
   const camera = useThree((s) => s.camera);
@@ -36,9 +31,8 @@ export function CameraRig() {
 
   const targetProgress = useRef(0);
   const currentProgress = useRef(0);
-  // Reusable vectors so we don't allocate per frame.
-  const pos = useRef(new THREE.Vector3());
-  const look = useRef(new THREE.Vector3());
+  const posScratch = useRef(new THREE.Vector3());
+  const lookScratch = useRef(new THREE.Vector3());
 
   useEffect(() => {
     const update = () => {
@@ -47,7 +41,6 @@ export function CameraRig() {
       const max = el.scrollHeight - el.clientHeight;
       targetProgress.current = max > 0 ? el.scrollTop / max : 0;
     };
-    // Defer one frame so the viewport ref is attached.
     const id = requestAnimationFrame(() => {
       update();
       const el = viewportRef.current;
@@ -61,21 +54,17 @@ export function CameraRig() {
   }, [viewportRef]);
 
   useFrame(() => {
-    // Low-pass filter so the camera feels weighted, not snappy.
+    // Low-pass smooth so scroll doesn't snap the camera.
     currentProgress.current +=
       (targetProgress.current - currentProgress.current) * 0.08;
     const p = currentProgress.current;
+    // Ease so the early portion has more motion (the "walk in" feel).
+    const eased = 1 - Math.pow(1 - p, 1.6);
 
-    // Ease the t-value so the early portion of the scroll has slightly
-    // more camera motion (the dolly-back is the dramatic part, the
-    // tilt continues into the deep page).
-    const eased = 1 - Math.pow(1 - p, 1.7);
-
-    pos.current.lerpVectors(TOP_POS, BOTTOM_POS, eased);
-    look.current.lerpVectors(TOP_LOOK, BOTTOM_LOOK, eased);
-
-    camera.position.copy(pos.current);
-    camera.lookAt(look.current);
+    posScratch.current.lerpVectors(TOP_POS, BOTTOM_POS, eased);
+    lookScratch.current.lerpVectors(TOP_LOOK, BOTTOM_LOOK, eased);
+    camera.position.copy(posScratch.current);
+    camera.lookAt(lookScratch.current);
   });
 
   return null;

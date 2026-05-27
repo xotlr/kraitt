@@ -1,22 +1,26 @@
 "use client";
 
 import { Canvas } from "@react-three/fiber";
+import { Bloom, EffectComposer } from "@react-three/postprocessing";
+import { BlendFunction, KernelSize } from "postprocessing";
 import { useMemo } from "react";
 import * as THREE from "three";
 import { useDeviceCapability } from "@/hooks/use-device-capability";
 import { Atmosphere } from "./atmosphere";
 import { CameraRig } from "./camera-rig";
-import { Strings } from "./strings";
+import { Terrain } from "./terrain";
 
 /**
  * Scene composition:
- *   1. Atmosphere — OLED-black field with sparse warm pockets + grain
- *   2. Strings — ground-plane horizontal cables, slithering, world-fixed
- *   3. CameraRig — scroll-driven dolly-back-and-tilt-up
+ *   1. Atmosphere — fullscreen OLED-black backdrop + film grain
+ *   2. Terrain — 3D plane with vertex-displaced FBM, fragment-drawn
+ *      gold contour lines. Real perspective camera tilted ~17° down
+ *      so the field reads as a landscape receding into the distance.
  *
- * The camera is the storytelling element on scroll. Strings sit still
- * on the ground; the camera flies up and back, opening the perspective.
- * No EffectComposer — see history. Tonemapping is ACES.
+ * The atmosphere uses its own bypassed camera (full-screen quad with
+ * gl_Position written directly). The terrain uses the regular Three
+ * camera. They compose because the atmosphere renders first
+ * (renderOrder=-1) and the terrain alpha-blends on top.
  */
 export function Scene() {
   const { tier, reducedMotion } = useDeviceCapability();
@@ -34,30 +38,48 @@ export function Scene() {
       <Canvas
         dpr={dpr}
         gl={{
-          antialias: false,
+          antialias: true,
           alpha: false,
           powerPreference: "high-performance",
-          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMapping: THREE.NoToneMapping,
           outputColorSpace: THREE.SRGBColorSpace,
         }}
-        onCreated={({ gl }) => {
-          gl.toneMappingExposure = 0.82;
-        }}
         camera={{
-          // Initial pose matches CameraRig's top-of-page pose so first
-          // paint isn't off — the rig takes over on frame 1 anyway.
-          position: [0, 0.4, 1.2],
+          // Camera sits 0.8 wu above the ground, looking 17° down with
+          // ~3.5 wu of forward offset. This gives a low landscape
+          // framing — horizon in the upper third, terrain stretches
+          // into the distance.
+          position: [0, 0.8, 3.5],
           fov: 55,
           near: 0.1,
-          far: 60,
+          far: 30,
+        }}
+        onCreated={({ camera }) => {
+          // Tilt camera ~17° down toward a point on the ground ahead.
+          camera.lookAt(0, -0.2, -2.5);
         }}
         frameloop={reducedMotion ? "demand" : "always"}
         style={{ background: "#000000" }}
       >
-        <ambientLight intensity={0.5} color="#7a808a" />
         <Atmosphere />
-        <Strings />
+        <Terrain />
         <CameraRig />
+
+        {/* Bloom is the "colorful gaussian blur" that makes the
+            terrain lines glow softly instead of reading as crisp
+            wireframe. Threshold is low (0.05) so the cool-cream
+            lines pick up bloom even at default brightness. Kernel
+            HUGE for soft, hazy spread. Intensity moderate. */}
+        <EffectComposer multisampling={0}>
+          <Bloom
+            intensity={0.55}
+            kernelSize={KernelSize.HUGE}
+            luminanceThreshold={0.05}
+            luminanceSmoothing={0.7}
+            mipmapBlur
+            blendFunction={BlendFunction.SCREEN}
+          />
+        </EffectComposer>
       </Canvas>
     </div>
   );

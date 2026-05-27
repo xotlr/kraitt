@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import { PageScroll } from "@/components/page-scroll";
 import { Scene } from "@/components/scene";
+import { VolumeSlider } from "@/components/volume-slider";
+import { AudioProvider } from "@/lib/audio";
 import { ScrollProvider } from "@/lib/scroll-context";
 import "./globals.css";
 
@@ -44,10 +46,13 @@ export default function RootLayout({
           PageScroll ScrollArea below. Without this, native scrollbars
           can still appear if children overflow the body. */}
       <body className="text-ink antialiased atmos overflow-hidden h-svh">
-        <ScrollProvider>
-          <Scene />
-          <PageScroll>{children}</PageScroll>
-        </ScrollProvider>
+        <AudioProvider>
+          <ScrollProvider>
+            <Scene />
+            <VolumeSlider />
+            <PageScroll>{children}</PageScroll>
+          </ScrollProvider>
+        </AudioProvider>
       </body>
     </html>
   );

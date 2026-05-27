@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
+import { AudioToggles } from "@/components/audio-toggle";
 import { useScrollTo, useScrollViewport } from "@/lib/scroll-context";
 import { cn } from "@/lib/utils";
 
@@ -88,12 +89,15 @@ export function Nav() {
             </li>
           ))}
         </ul>
-        <a
-          href="mailto:hello@sufiankraitt.com"
-          className="hidden md:inline text-ink-muted hover:text-ink transition-colors"
-        >
-          hello@sufiankraitt.com
-        </a>
+        <div className="hidden md:flex items-center gap-7">
+          <AudioToggles />
+          <a
+            href="mailto:hello@sufiankraitt.com"
+            className="text-ink-muted hover:text-ink transition-colors"
+          >
+            hello@sufiankraitt.com
+          </a>
+        </div>
       </div>
     </motion.nav>
   );

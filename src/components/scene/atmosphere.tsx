@@ -3,17 +3,38 @@
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
+import { useAudioLevels } from "@/lib/audio";
 
 /**
- * Atmosphere — a very dim warm noise field that sits behind the vines.
- * Plain shader material on a fullscreen plane drawn at z = -2. Much
- * subtler than the previous Instrument so the vines stay the focal point.
+ * Atmosphere — the entire visual: OLED-black bed, film grain, and the
+ * wavy "string" lines. Lines are drawn as iso-contours of a
+ * domain-warped FBM noise field. Domain warping is the operation that
+ * turns concentric noise blobs into long flowing strands — sampling
+ * `fbm(uv + fbm(uv))` instead of `fbm(uv)` warps the input space, and
+ * the resulting iso-contours bend into organic curves rather than
+ * sitting as round blobs.
+ *
+ * Why this technique instead of geometry ribbons: sine displacement of
+ * line/ribbon vertices can't produce continuously flowing curves — it
+ * produces parallel sinusoidal lines, period. Iso-contours of warped
+ * noise are topologically the right primitive for "wavy strings."
+ *
+ * References:
+ *  - Inigo Quilez, "Domain warping" — the foundational article.
+ *  - Codrops "Dissecting a Wavy Shader" (Oct 2025).
+ *  - ShaderToy sstXW8 minimal wavy lines example.
+ *
+ * Audio reactivity:
+ *  - uBass:  line brightness, color tint toward warm amber
+ *  - uMid:   warp drift speed (faster flow on energetic passages)
+ *  - uHigh:  line width (sharper / more nervous on transient hits)
  */
 
 const vertexShader = /* glsl */ `
   varying vec2 vUv;
   void main() {
     vUv = uv;
+    // Fullscreen quad — bypass camera entirely.
     gl_Position = vec4(position.xy, 0.0, 1.0);
   }
 `;
@@ -23,13 +44,16 @@ const fragmentShader = /* glsl */ `
   varying vec2 vUv;
   uniform float uTime;
   uniform vec2 uResolution;
+  uniform float uBass;
+  uniform float uMid;
+  uniform float uHigh;
 
+  // --- hash + simplex 3D noise (Ashima) ---
   float hash(vec2 p) {
     vec3 p3 = fract(vec3(p.xyx) * 0.1031);
     p3 += dot(p3, p3.yzx + 33.33);
     return fract((p3.x + p3.y) * p3.z);
   }
-
   vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
   vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
   vec4 permute(vec4 x) { return mod289(((x * 34.0) + 1.0) * x); }
@@ -76,73 +100,76 @@ const fragmentShader = /* glsl */ `
     m = m * m;
     return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
   }
-  // Two-octave FBM. Three octaves looked nicer but cost 50% more per
-  // fragment; the difference is invisible once we threshold the field
-  // to only show the brightest pockets.
+
+  // 2-octave FBM. Cheap; the visual interest comes from domain warping
+  // the result, not from stacking many octaves.
   float fbm(vec3 p) {
-    float v = 0.0; float a = 0.6; vec3 shift = vec3(100.0);
-    for (int i = 0; i < 2; i++) { v += a * snoise(p); p = p * 1.9 + shift; a *= 0.5; }
+    float v = 0.0;
+    float a = 0.6;
+    vec3 shift = vec3(100.0);
+    for (int i = 0; i < 2; i++) {
+      v += a * snoise(p);
+      p = p * 1.9 + shift;
+      a *= 0.5;
+    }
     return v;
   }
+
   void main() {
     vec2 uv = vUv;
-    // Single FBM call (was 3 averaged + a second FBM = 9 octave calls
-    // per pixel). The averaging "blur" was free-looking but expensive;
-    // dropping it costs us a hair of softness that the film grain
-    // covers anyway.
-    float n = fbm(vec3(uv * 0.9, uTime * 0.04));
-    float b = n * 0.5 + 0.5;
+    vec2 p = uv;
+    p.x *= uResolution.x / uResolution.y;
 
-    // OLED-black bed. The warm pocket only appears in the brightest 5%
-    // of the field — everywhere else this resolves to pure 0,0,0. The
-    // pocket itself is barely-saturated taupe, so when it does appear
-    // it reads as a slight breath, not a brown wash.
+    // OLED black backdrop. The shader is back to a pure background
+    // role now that the terrain (terrain.tsx) draws the actual lines.
+    // We keep a faint warm pocket in the deepest noise valleys for
+    // the slightest sense of atmosphere; everywhere else is true 0.
+    float t = uTime * 0.04;
+    float n = fbm(vec3(p * 1.4, t));
     vec3 bg = vec3(0.0);
-    vec3 warm = vec3(0.022, 0.016, 0.010);
-    vec3 col = mix(bg, warm, smoothstep(0.9, 1.0, b));
+    vec3 pocketColor = vec3(0.020, 0.014, 0.008);
+    float pocket = smoothstep(0.94, 1.0, n * 0.5 + 0.5);
+    float pocketBoost = 1.0 + uBass * 0.6;
+    vec3 col = mix(bg, pocketColor * pocketBoost, pocket);
 
-    // Vignette pulls edges to true 0. Multiplying by zero stays zero.
-    float v = 1.0 - pow(abs(uv.y - 0.5) * 1.9, 2.0);
-    col *= mix(0.0, 1.0, v);
-    float vx = 1.0 - pow(abs(uv.x - 0.5) * 1.6, 2.0);
-    col *= mix(0.0, 1.0, vx);
-
-    // Animated film grain. One grain cell per ~2 screen pixels;
-    // fract(time*100) re-rolls every frame so it twinkles. With a
-    // pure-black bed, grain is most of what the user perceives in the
-    // dark areas — it's the only texture in the field outside the
-    // pockets.
+    // Film grain — bumped intensity 0.045 -> 0.07 per request for
+    // visible noise overlay. Single grain cell per ~2 screen pixels;
+    // fract(time*100) re-rolls every frame for film-stock twinkle.
     float grainSize = 2.0;
     vec2 gridPos = uv * uResolution / grainSize + fract(uTime * 100.0);
-    float grain = (hash(gridPos) - 0.5) * 0.045;
+    float grain = (hash(gridPos) - 0.5) * 0.07;
     col += grain;
 
-    // Clamp negative grain so we don't fight OLED-black with sub-zero
-    // values (which would still display as 0 anyway, but this keeps
-    // the math honest).
     col = max(col, vec3(0.0));
-
     gl_FragColor = vec4(col, 1.0);
   }
 `;
 
 export function Atmosphere() {
   const matRef = useRef<THREE.ShaderMaterial>(null);
+  const levels = useAudioLevels();
+
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },
       uResolution: { value: new THREE.Vector2(1, 1) },
+      uBass: { value: 0 },
+      uMid: { value: 0 },
+      uHigh: { value: 0 },
     }),
     []
   );
+
   useFrame(({ clock, size }) => {
     if (!matRef.current) return;
-    matRef.current.uniforms.uTime.value = clock.elapsedTime;
-    (matRef.current.uniforms.uResolution.value as THREE.Vector2).set(
-      size.width,
-      size.height
-    );
+    const u = matRef.current.uniforms;
+    u.uTime.value = clock.elapsedTime;
+    (u.uResolution.value as THREE.Vector2).set(size.width, size.height);
+    u.uBass.value = levels.current.bass;
+    u.uMid.value = levels.current.mid;
+    u.uHigh.value = levels.current.high;
   });
+
   return (
     <mesh frustumCulled={false} renderOrder={-1}>
       <planeGeometry args={[2, 2]} />

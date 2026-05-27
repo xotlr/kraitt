@@ -20,14 +20,11 @@
   --color-hairline: #1c1f24;
   --color-hairline-hover: #2c3038;
 
-  /* String color for the shader — pale warm-grey, cited in CSS so the
-     two systems share the same source of truth. */
-  --color-string: #d8d2c4;
-
-  /* The single amber hit. Used ONCE: the dot after "Kraitt" in the hero.
-     Kept in the system because it's a deliberate single hit, but every
-     other use must justify itself. */
-  --color-accent: #c08a5e;
+  /* String color for the shader — pale cool-cream, cited in CSS so
+     the two systems share the same source of truth. The hero's
+     trailing dot picks this up so the wordmark belongs to the same
+     cold palette as the strands. */
+  --color-string: #e6dfd1;
 
   --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-serif), ui-serif, Georgia, serif;

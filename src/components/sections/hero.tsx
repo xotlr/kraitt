@@ -48,8 +48,9 @@ export function Hero() {
           <span className="block">Sufian</span>
           <span className="block text-ink-muted">
             Kraitt
-            {/* The single amber hit on the entire site. */}
-            <span className="text-[color:var(--color-accent)]">.</span>
+            {/* Dot picks up the string color so the wordmark belongs
+                to the same cold palette as the shader. */}
+            <span className="text-[color:var(--color-string)]">.</span>
           </span>
         </motion.h1>
 
