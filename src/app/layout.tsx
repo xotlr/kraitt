@@ -1,13 +1,22 @@
 import type { Metadata } from "next";
-import { Fraunces, Geist_Mono } from "next/font/google";
+import { Fraunces, Geist, Geist_Mono } from "next/font/google";
+import { PageScroll } from "@/components/page-scroll";
 import { Scene } from "@/components/scene";
+import { ScrollProvider } from "@/lib/scroll-context";
 import "./globals.css";
+
+const geist = Geist({
+  subsets: ["latin"],
+  variable: "--font-display",
+  weight: ["200", "300", "400", "500"],
+  display: "swap",
+});
 
 const fraunces = Fraunces({
   subsets: ["latin"],
-  variable: "--font-display",
+  variable: "--font-serif",
   axes: ["SOFT", "WONK", "opsz"],
-  style: ["normal", "italic"],
+  style: ["italic"],
   display: "swap",
 });
 
@@ -27,10 +36,18 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="de" className={`${fraunces.variable} ${geistMono.variable}`}>
-      <body className="text-ink antialiased atmos overflow-x-hidden">
-        <Scene />
-        {children}
+    <html
+      lang="de"
+      className={`${geist.variable} ${fraunces.variable} ${geistMono.variable}`}
+    >
+      {/* overflow-hidden because actual page scroll happens inside the
+          PageScroll ScrollArea below. Without this, native scrollbars
+          can still appear if children overflow the body. */}
+      <body className="text-ink antialiased atmos overflow-hidden h-svh">
+        <ScrollProvider>
+          <Scene />
+          <PageScroll>{children}</PageScroll>
+        </ScrollProvider>
       </body>
     </html>
   );

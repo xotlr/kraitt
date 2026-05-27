@@ -39,7 +39,9 @@ export function Referenzen() {
           title={
             <>
               Eine Auswahl{" "}
-              <span className="italic text-ink-muted">dessen, was bleibt.</span>
+              <span className="font-serif-italic text-ink">
+                dessen, was bleibt.
+              </span>
             </>
           }
         />
@@ -59,14 +61,14 @@ export function Referenzen() {
                 onClick={() => setFilter(c.id)}
                 className={cn(
                   "relative pb-1.5 transition-colors duration-500",
-                  isActive ? "text-amber" : "text-ink-muted hover:text-ink"
+                  isActive ? "text-ink" : "text-ink-muted hover:text-ink"
                 )}
               >
                 {c.label}
                 {isActive && (
                   <motion.span
                     layoutId="filter-underline"
-                    className="absolute inset-x-0 -bottom-px h-px bg-amber"
+                    className="absolute inset-x-0 -bottom-px h-px bg-ink"
                     transition={{ type: "spring", stiffness: 350, damping: 30 }}
                   />
                 )}
@@ -102,7 +104,7 @@ export function Referenzen() {
                   <span className="col-span-1 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-faint">
                     {String(i + 1).padStart(2, "0")}
                   </span>
-                  <span className="col-span-12 md:col-span-5 font-display font-light text-2xl md:text-[2rem] tracking-tight transition-colors duration-500 group-hover:text-amber">
+                  <span className="col-span-12 md:col-span-5 font-heading text-2xl md:text-[2rem] transition-colors duration-500 group-hover:text-ink">
                     {p.title}
                   </span>
                   <span className="col-span-6 md:col-span-3 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
@@ -115,7 +117,7 @@ export function Referenzen() {
                     {p.year}
                   </span>
 
-                  <span className="pointer-events-none absolute inset-x-0 -bottom-px h-px bg-amber origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]" />
+                  <span className="pointer-events-none absolute inset-x-0 -bottom-px h-px bg-ink/50 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]" />
                 </button>
               </motion.li>
             ))}
@@ -127,14 +129,14 @@ export function Referenzen() {
         <DialogContent>
           {active && (
             <>
-              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-amber mb-2">
+              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink-muted mb-2">
                 {active.year} · {active.client}
               </div>
               <DialogTitle>{active.title}</DialogTitle>
               <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-muted mt-1 mb-5">
                 {active.role} — {active.medium}
               </div>
-              <DialogDescription className="text-base md:text-lg leading-[1.65] font-light">
+              <DialogDescription className="text-base md:text-lg leading-[1.65] font-body">
                 {active.description}
               </DialogDescription>
               <dl className="mt-7 pt-6 border-t border-hairline grid grid-cols-3 gap-4 font-mono text-[10px] uppercase tracking-[0.18em]">

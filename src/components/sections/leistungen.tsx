@@ -59,8 +59,9 @@ export function Leistungen() {
           label="Leistungen"
           title={
             <>
-              Was ich <span className="italic text-ink-muted">tue</span>, wenn
-              ich arbeite.
+              Was ich{" "}
+              <span className="font-serif-italic text-ink">tue</span>, wenn ich
+              arbeite.
             </>
           }
         />
@@ -79,10 +80,10 @@ export function Leistungen() {
               }}
             >
               <div className="flex items-baseline justify-between mb-8 pb-5 border-b border-hairline">
-                <h3 className="font-display text-h2 leading-none tracking-tight font-light">
+                <h3 className="font-heading text-h2 leading-none">
                   {col.heading}
                 </h3>
-                <span className="eyebrow text-amber">{col.index}</span>
+                <span className="eyebrow text-ink-faint">{col.index}</span>
               </div>
               <ul>
                 {col.items.map((item) => (
@@ -91,14 +92,14 @@ export function Leistungen() {
                     className="group relative border-b border-hairline last:border-b-0"
                   >
                     <div className="flex items-baseline justify-between gap-4 py-5 cursor-default">
-                      <span className="font-display text-lg md:text-xl font-light text-ink/90 group-hover:text-amber transition-colors duration-500">
+                      <span className="font-body text-lg md:text-xl text-ink/90 group-hover:text-ink transition-colors duration-500">
                         {item.name}
                       </span>
                       <span className="hidden md:block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint text-right max-w-[55%]">
                         {item.desc}
                       </span>
                     </div>
-                    <span className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-amber origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]" />
+                    <span className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-ink/40 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]" />
                   </li>
                 ))}
               </ul>

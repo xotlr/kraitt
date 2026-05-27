@@ -24,7 +24,7 @@ export function Kontakt() {
           title={
             <>
               Lass uns über das{" "}
-              <span className="italic text-ink-muted">Klangbild</span>{" "}
+              <span className="font-serif-italic text-ink">Klangbild</span>{" "}
               sprechen.
             </>
           }
@@ -38,20 +38,18 @@ export function Kontakt() {
           transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
           className="group block py-12 md:py-20"
         >
-          <span
-            className="font-display-thin block text-[clamp(2.25rem,8vw,7.5rem)] leading-[0.95] tracking-tighter text-balance italic text-ink/85 group-hover:text-amber transition-colors duration-700"
-          >
+          <span className="font-display block text-[clamp(2.25rem,8vw,7.5rem)] leading-[0.95] text-balance text-ink/85 group-hover:text-ink transition-colors duration-700">
             {email}
           </span>
-          <span className="mt-8 inline-flex items-center gap-3 eyebrow text-amber">
-            <span className="block h-px w-10 bg-amber" />
+          <span className="mt-8 inline-flex items-center gap-3 eyebrow text-ink-muted">
+            <span className="block h-px w-10 bg-ink-muted" />
             E-Mail schreiben
           </span>
         </motion.a>
 
         <footer className="mt-24 pt-8 border-t border-hairline">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-8">
-            <div className="space-y-2 eyebrow text-ink-muted">
+            <div className="space-y-2 eyebrow">
               <p className="text-ink/80">Sufian Kraitt</p>
               <p>Audio Engineer · Wien, AT</p>
             </div>
@@ -63,7 +61,7 @@ export function Kontakt() {
                     href={l.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-ink-muted hover:text-amber transition-colors duration-500"
+                    className="text-ink-muted hover:text-ink transition-colors duration-500"
                   >
                     {l.label} ↗
                   </a>

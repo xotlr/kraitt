@@ -76,43 +76,51 @@ const fragmentShader = /* glsl */ `
     m = m * m;
     return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
   }
+  // Two-octave FBM. Three octaves looked nicer but cost 50% more per
+  // fragment; the difference is invisible once we threshold the field
+  // to only show the brightest pockets.
   float fbm(vec3 p) {
-    float v = 0.0; float a = 0.55; vec3 shift = vec3(100.0);
-    for (int i = 0; i < 3; i++) { v += a * snoise(p); p = p * 1.85 + shift; a *= 0.45; }
+    float v = 0.0; float a = 0.6; vec3 shift = vec3(100.0);
+    for (int i = 0; i < 2; i++) { v += a * snoise(p); p = p * 1.9 + shift; a *= 0.5; }
     return v;
   }
   void main() {
     vec2 uv = vUv;
-    // Soften the FBM by averaging slightly-offset samples — cheap blur
-    // that smooths the noise blobs without a separate post pass.
-    float n1 = (
-      fbm(vec3(uv * 0.9, uTime * 0.04)) +
-      fbm(vec3((uv + vec2(0.004, 0.0)) * 0.9, uTime * 0.04)) +
-      fbm(vec3((uv - vec2(0.0, 0.004)) * 0.9, uTime * 0.04))
-    ) / 3.0;
-    float n2 = fbm(vec3(uv * 0.7 + 200.0, uTime * 0.03));
-    float b = (n1 * 0.5 + 0.5) * (n2 * 0.5 + 0.5);
+    // Single FBM call (was 3 averaged + a second FBM = 9 octave calls
+    // per pixel). The averaging "blur" was free-looking but expensive;
+    // dropping it costs us a hair of softness that the film grain
+    // covers anyway.
+    float n = fbm(vec3(uv * 0.9, uTime * 0.04));
+    float b = n * 0.5 + 0.5;
 
-    // Near-black bed with the faintest warm breathing in the brightest
-    // blobs. Field has texture but never reads as brown.
-    vec3 bg = vec3(0.003, 0.002, 0.001);
-    vec3 warm = vec3(0.045, 0.022, 0.008);
-    vec3 col = mix(bg, warm, smoothstep(0.55, 0.95, b));
+    // OLED-black bed. The warm pocket only appears in the brightest 5%
+    // of the field — everywhere else this resolves to pure 0,0,0. The
+    // pocket itself is barely-saturated taupe, so when it does appear
+    // it reads as a slight breath, not a brown wash.
+    vec3 bg = vec3(0.0);
+    vec3 warm = vec3(0.022, 0.016, 0.010);
+    vec3 col = mix(bg, warm, smoothstep(0.9, 1.0, b));
 
-    // Strong vignette pulls the corners to pure black so the tapestry
-    // sits in a dark hall, not a brown room.
+    // Vignette pulls edges to true 0. Multiplying by zero stays zero.
     float v = 1.0 - pow(abs(uv.y - 0.5) * 1.9, 2.0);
-    col *= mix(0.25, 1.0, v);
+    col *= mix(0.0, 1.0, v);
     float vx = 1.0 - pow(abs(uv.x - 0.5) * 1.6, 2.0);
-    col *= mix(0.45, 1.0, vx);
+    col *= mix(0.0, 1.0, vx);
 
-    // Animated film grain — moneypower's trick. uv * resolution gives one
-    // grain cell per ~2 screen pixels; fract(time*100) re-rolls every
-    // frame so the grain twinkles like real film stock.
+    // Animated film grain. One grain cell per ~2 screen pixels;
+    // fract(time*100) re-rolls every frame so it twinkles. With a
+    // pure-black bed, grain is most of what the user perceives in the
+    // dark areas — it's the only texture in the field outside the
+    // pockets.
     float grainSize = 2.0;
     vec2 gridPos = uv * uResolution / grainSize + fract(uTime * 100.0);
-    float grain = (hash(gridPos) - 0.5) * 0.05;
+    float grain = (hash(gridPos) - 0.5) * 0.045;
     col += grain;
+
+    // Clamp negative grain so we don't fight OLED-black with sub-zero
+    // values (which would still display as 0 anyway, but this keeps
+    // the math honest).
+    col = max(col, vec3(0.0));
 
     gl_FragColor = vec4(col, 1.0);
   }

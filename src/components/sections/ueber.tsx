@@ -23,8 +23,8 @@ export function Ueber() {
           title={
             <>
               Ein Ohr für den{" "}
-              <span className="italic text-ink-muted">Raum zwischen</span> den
-              Tönen.
+              <span className="font-serif-italic text-ink">Raum zwischen</span>{" "}
+              den Tönen.
             </>
           }
         />
@@ -35,21 +35,22 @@ export function Ueber() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-10%" }}
             transition={{ duration: 1, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-            className="lg:col-span-7 lg:col-start-2 space-y-7 text-body-lg leading-[var(--text-body-lg--line-height)] text-ink/80 font-light text-pretty"
+            className="lg:col-span-7 lg:col-start-2 space-y-7 text-body-lg leading-[var(--text-body-lg--line-height)] text-ink/80 font-body text-pretty"
           >
             <p>
               Mein Weg in die Audiowelt begann mit der Frage, warum manche
-              Aufnahmen <span className="italic">da</span> sind und andere
-              nicht. Heute arbeite ich an dieser Antwort jeden Tag — zwischen
-              Tonangel und Mischpult, zwischen Set und Studio.
+              Aufnahmen{" "}
+              <span className="font-serif-italic text-ink">da</span> sind und
+              andere nicht. Heute arbeite ich an dieser Antwort jeden Tag —
+              zwischen Tonangel und Mischpult, zwischen Set und Studio.
             </p>
             <p>
               Nach meinem Abschluss am{" "}
-              <span className="italic">SAE Institute</span> habe ich mich auf
-              den schmalen Grat zwischen technischer Präzision und
-              gestalterischer Intuition spezialisiert. Film und TV verlangen
-              Disziplin und Geschwindigkeit; Musik verlangt Geduld und Haltung.
-              Beides interessiert mich gleichermaßen.
+              <span className="font-serif-italic text-ink">SAE Institute</span>{" "}
+              habe ich mich auf den schmalen Grat zwischen technischer
+              Präzision und gestalterischer Intuition spezialisiert. Film und TV
+              verlangen Disziplin und Geschwindigkeit; Musik verlangt Geduld und
+              Haltung. Beides interessiert mich gleichermaßen.
             </p>
             <p className="text-ink-muted">
               Ich arbeite für ORF-Produktionen, Spielfilme, Kurzfilme,

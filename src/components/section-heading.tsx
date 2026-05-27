@@ -23,13 +23,11 @@ export function SectionHeading({
       className={cn("mb-20 md:mb-28", className)}
     >
       <div className="flex items-baseline gap-6 mb-10 eyebrow">
-        <span className="text-amber">{index}</span>
+        <span className="text-ink">{index}</span>
         <span className="h-px flex-1 bg-hairline" />
         <span>{label}</span>
       </div>
-      <h2
-        className="font-display-thin text-h1 leading-[var(--text-h1--line-height)] tracking-tighter max-w-[18ch] text-balance"
-      >
+      <h2 className="font-heading text-h1 leading-[var(--text-h1--line-height)] max-w-[18ch] text-balance">
         {title}
       </h2>
     </motion.div>

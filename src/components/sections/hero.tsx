@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useScrollTo } from "@/lib/scroll-context";
 
 const stagger = {
   hidden: {},
@@ -16,6 +17,7 @@ const rise = {
 };
 
 export function Hero() {
+  const scrollTo = useScrollTo();
   return (
     <section
       id="hero"
@@ -28,7 +30,7 @@ export function Hero() {
           transition={{ duration: 1.6, delay: 0.3 }}
           className="eyebrow flex items-center gap-3"
         >
-          <span className="h-px w-10 bg-amber/60" />
+          <span className="h-px w-10 bg-ink-faint" />
           Wien · Audio Engineer · Verfügbar 2026
         </motion.p>
       </div>
@@ -41,23 +43,25 @@ export function Hero() {
       >
         <motion.h1
           variants={rise}
-          className="font-display-thin text-display leading-[var(--text-display--line-height)] tracking-tighter text-balance"
+          className="font-display text-display leading-[var(--text-display--line-height)] text-balance"
         >
           <span className="block">Sufian</span>
-          <span className="block italic text-ink-muted">
-            Kraitt<span className="not-italic text-amber">.</span>
+          <span className="block text-ink-muted">
+            Kraitt
+            {/* The single amber hit on the entire site. */}
+            <span className="text-[color:var(--color-accent)]">.</span>
           </span>
         </motion.h1>
 
         <motion.p
           variants={rise}
-          className="mt-12 md:mt-16 max-w-[44ch] text-body-lg leading-[var(--text-body-lg--line-height)] text-ink/85 font-light"
+          className="mt-12 md:mt-16 max-w-[50ch] text-body-lg leading-[var(--text-body-lg--line-height)] text-ink/80 font-body"
         >
           Audio für{" "}
-          <span className="italic text-amber">Film</span>,{" "}
-          <span className="italic text-amber">Television</span> und{" "}
-          <span className="italic text-amber">Musikproduktion</span> — am Set,
-          im Studio, in der Post.
+          <span className="font-serif-italic text-ink">Film</span>,{" "}
+          <span className="font-serif-italic text-ink">Television</span> und{" "}
+          <span className="font-serif-italic text-ink">Musikproduktion</span>{" "}
+          — am Set, im Studio, in der Post.
         </motion.p>
       </motion.div>
 
@@ -68,7 +72,7 @@ export function Hero() {
         className="relative z-10 container-edge pb-12 md:pb-16"
       >
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 eyebrow">
-          <div className="flex flex-wrap gap-x-8 gap-y-3 text-ink/60">
+          <div className="flex flex-wrap gap-x-8 gap-y-3 text-ink-muted">
             <span>Setton</span>
             <span>Postproduktion</span>
             <span>Mixing</span>
@@ -77,7 +81,8 @@ export function Hero() {
           </div>
           <a
             href="#ueber"
-            className="group inline-flex items-center gap-3 text-ink/60 hover:text-amber transition-colors"
+            onClick={scrollTo("ueber")}
+            className="group inline-flex items-center gap-3 text-ink-muted hover:text-ink transition-colors"
           >
             Scroll
             <span className="block h-px w-12 bg-current group-hover:w-20 transition-all duration-700" />
