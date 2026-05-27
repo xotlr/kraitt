@@ -1,100 +1,94 @@
 /**
- * Path definitions for the strings. Each string is a vertical thread
- * with a gentle weave, sampled later into a polyline.
+ * Ground-plane string paths. Each string is a horizontal cable lying on
+ * the ground (y ≈ 0), running along the X axis, slithering in Z as you
+ * move along it. Stacked in rows going into the distance (-Z), so when
+ * the camera looks slightly down you see parallel snakes vanishing
+ * toward the horizon.
  *
- * Coordinate space (kept stable from the previous tube version so the
- * surrounding scene math doesn't shift):
- *  - x in [-2, 2], scaled at runtime by viewport.width * 0.5
- *  - y in [0, 1], 1 = top, 0 = bottom of the vertical band
- *  - z = depth; positive = forward, negative = back
+ * Coordinate space (now world-aligned, not viewport-scaled):
+ *  - x: world units, anchors span roughly [-X_HALF, +X_HALF]
+ *  - y: near 0 with tiny jitter — they sit on the ground
+ *  - z: each string is at a fixed z (its row), with slither modulating
+ *       per-sample z within the path itself
  *
- * Strings are intentionally many and thin. The visual interest comes
- * from density and pluck, not from any single string being dramatic.
+ * Camera reads:
+ *  - Top of page: pos (0, 0.4, 1.2) — close, low, looking down
+ *  - Bottom: pos (0, 2.5, 5.0) looking at (0, 0, -2) — high, back, tilted up
+ *
+ * Stings are world-fixed; only the camera moves on scroll.
  */
 export type StringPath = {
   anchors: [number, number, number][];
-  /** Visual intensity 0..1 — controls opacity, not glow. */
+  /** Visual intensity 0..1 — controls opacity. */
   intensity: number;
-  /** Scroll progress 0..1 before this string starts drawing. */
-  growStart: number;
-  /** Idle breathing — sub-pixel drift, mostly imperceptible. */
+  /** Phase offset for idle wave so adjacent strings don't move in sync. */
   breathPhase: number;
-  breathDepth: number;
 };
 
-function weave(
-  baseX: number,
+const X_HALF = 6.0; // each string spans -6..+6 in X
+const SAMPLES_PER_PATH = 9; // anchor points; catmull-rom interpolates between
+
+/** Build one slithering horizontal string at given row z and y. */
+function ground(
   z: number,
-  weaveAmp: number,
+  y: number,
+  slitherAmp: number,
+  slitherFreq: number,
   phase: number
 ): [number, number, number][] {
-  // More anchor points = smoother resting curves. We also use multiple
-  // sine frequencies so the resting shape isn't a single clean sinusoid
-  // (which would read as engineered) but a quietly-varying wave —
-  // closer to how a slack string actually hangs.
-  const ys = [
-    1.08, 0.95, 0.82, 0.7, 0.58, 0.46, 0.34, 0.22, 0.1, -0.02, -0.06,
-  ];
-  return ys.map((y, i) => {
-    const t = i / (ys.length - 1);
-    // Two superimposed waves: one slow, one half-cycle slower.
-    const w =
-      Math.sin(t * Math.PI * 2.2 + phase) * 0.7 +
-      Math.sin(t * Math.PI * 1.1 + phase * 0.7) * 0.45;
-    const x = baseX + w * weaveAmp;
-    return [x, y, z];
-  });
+  const out: [number, number, number][] = [];
+  for (let i = 0; i < SAMPLES_PER_PATH; i++) {
+    const t = i / (SAMPLES_PER_PATH - 1);
+    const x = -X_HALF + t * (X_HALF * 2);
+    // Slither in z — two superimposed sines for organic-looking bends
+    // that aren't a clean sinusoid. Slow primary + faster overtone.
+    const slither =
+      Math.sin(t * Math.PI * slitherFreq + phase) * slitherAmp +
+      Math.sin(t * Math.PI * slitherFreq * 2.3 + phase * 1.7) * slitherAmp * 0.35;
+    out.push([x, y, z + slither]);
+  }
+  return out;
 }
-
-const COUNT_FG = 14;
-const COUNT_MID = 14;
-const COUNT_BG = 12;
 
 const paths: StringPath[] = [];
 
-// foreground — most opaque, frontmost
-for (let i = 0; i < COUNT_FG; i++) {
-  const u = i / (COUNT_FG - 1);
-  const baseX = -1.85 + u * 3.7;
-  const jitter = Math.sin(i * 12.9898) * 0.05;
-  const z = 0.32 + Math.sin(i * 0.7) * 0.1;
-  paths.push({
-    anchors: weave(baseX + jitter, z, 0.15, i * 1.7),
-    intensity: 0.65 + (i % 4 === 0 ? 0.15 : 0),
-    growStart: (i * 0.011) % 0.08,
-    breathPhase: i * 0.83,
-    breathDepth: 0.18,
-  });
-}
+// Strings stacked in rows going into the distance. Front row (z = +0.5)
+// sits just behind the camera's initial focal point. Each subsequent
+// row is pushed -0.45 deeper. Rows further back are dimmer.
+const ROW_COUNT = 26;
+const ROW_SPACING = 0.45;
+const FRONT_Z = 0.5;
 
-// mid
-for (let i = 0; i < COUNT_MID; i++) {
-  const u = (i + 0.5) / COUNT_MID;
-  const baseX = -1.92 + u * 3.84;
-  const jitter = Math.sin(i * 78.233) * 0.04;
-  const z = -0.05 + Math.cos(i * 0.9) * 0.08;
-  paths.push({
-    anchors: weave(baseX + jitter, z, 0.115, i * 2.1 + 1.0),
-    intensity: 0.42 + (i % 3 === 0 ? 0.08 : 0),
-    growStart: (i * 0.014 + 0.05) % 0.12,
-    breathPhase: i * 1.27 + 0.5,
-    breathDepth: 0.22,
-  });
-}
+for (let i = 0; i < ROW_COUNT; i++) {
+  const rowZ = FRONT_Z - i * ROW_SPACING;
+  // Each row has 1-2 strings slightly offset so the field has density
+  // without becoming a perfect grid.
+  const stringsInRow = i % 3 === 0 ? 2 : 1;
+  for (let j = 0; j < stringsInRow; j++) {
+    // Slight per-string y jitter so they're not all on the exact same
+    // plane — gives a subtle 3D thickness to the ground field.
+    const yJitter = (Math.sin(i * 12.9 + j * 7.3) * 0.5 - 0.5 + 1) * 0.04;
+    // Slight per-string z offset within the row.
+    const zOffset = j === 0 ? 0 : 0.18 * (Math.sin(i * 5.7) > 0 ? 1 : -1);
+    const phase = i * 1.7 + j * 2.4;
+    // Slither amplitude varies — some strings nearly straight, others
+    // bend a lot. Bigger bends in the middle of the field, calmer
+    // strings up close and far away.
+    const distanceFromMid = Math.abs(i - ROW_COUNT / 2) / (ROW_COUNT / 2);
+    const slitherAmp = 0.35 + (1 - distanceFromMid) * 0.45 + (j === 0 ? 0 : 0.1);
+    // Frequency: how many "S" curves along the length.
+    const slitherFreq = 1.4 + Math.sin(i * 0.7) * 0.6;
 
-// background — barely there, gives depth
-for (let i = 0; i < COUNT_BG; i++) {
-  const u = (i + 0.3) / COUNT_BG;
-  const baseX = -1.98 + u * 3.96;
-  const jitter = Math.sin(i * 43.758) * 0.05;
-  const z = -0.45 + Math.sin(i * 1.1) * 0.05;
-  paths.push({
-    anchors: weave(baseX + jitter, z, 0.1, i * 2.7 + 2.3),
-    intensity: 0.22 + (i % 5 === 0 ? 0.04 : 0),
-    growStart: (i * 0.013 + 0.08) % 0.15,
-    breathPhase: i * 1.91 + 1.2,
-    breathDepth: 0.28,
-  });
+    // Intensity falls off with distance from camera so the field has
+    // natural depth-cueing on top of perspective shrinkage.
+    const depthFade = 1 - (i / ROW_COUNT) * 0.55;
+
+    paths.push({
+      anchors: ground(rowZ + zOffset, yJitter, slitherAmp, slitherFreq, phase),
+      intensity: 0.55 * depthFade + (j === 0 ? 0 : 0.08),
+      breathPhase: phase,
+    });
+  }
 }
 
 export const stringPaths: StringPath[] = paths;

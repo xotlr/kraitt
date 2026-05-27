@@ -5,21 +5,18 @@ import { useMemo } from "react";
 import * as THREE from "three";
 import { useDeviceCapability } from "@/hooks/use-device-capability";
 import { Atmosphere } from "./atmosphere";
+import { CameraRig } from "./camera-rig";
 import { Strings } from "./strings";
 
 /**
  * Scene composition:
- *   1. OLED-black atmosphere with rare sparse warm pockets + film grain
- *   2. thin grey Line2 strings drifting in the background
+ *   1. Atmosphere — OLED-black field with sparse warm pockets + grain
+ *   2. Strings — ground-plane horizontal cables, slithering, world-fixed
+ *   3. CameraRig — scroll-driven dolly-back-and-tilt-up
  *
- * No EffectComposer. With a pure-black bed and strings authored at
- * desaturated greys, post-processing (bloom, hue-sat) was paying its
- * full per-frame cost for no visible output — the bloom threshold
- * never tripped and the saturation cut had nothing to desaturate.
- * Ripping it removes a full-screen mipmap chain per frame.
- *
- * Tonemapping is ACES filmic with low exposure so any warmth in the
- * sparse pockets stays compressed.
+ * The camera is the storytelling element on scroll. Strings sit still
+ * on the ground; the camera flies up and back, opening the perspective.
+ * No EffectComposer — see history. Tonemapping is ACES.
  */
 export function Scene() {
   const { tier, reducedMotion } = useDeviceCapability();
@@ -47,10 +44,12 @@ export function Scene() {
           gl.toneMappingExposure = 0.82;
         }}
         camera={{
-          position: [0, 0, 2.4],
-          fov: 45,
+          // Initial pose matches CameraRig's top-of-page pose so first
+          // paint isn't off — the rig takes over on frame 1 anyway.
+          position: [0, 0.4, 1.2],
+          fov: 55,
           near: 0.1,
-          far: 50,
+          far: 60,
         }}
         frameloop={reducedMotion ? "demand" : "always"}
         style={{ background: "#000000" }}
@@ -58,6 +57,7 @@ export function Scene() {
         <ambientLight intensity={0.5} color="#7a808a" />
         <Atmosphere />
         <Strings />
+        <CameraRig />
       </Canvas>
     </div>
   );
