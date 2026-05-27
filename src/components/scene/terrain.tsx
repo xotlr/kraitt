@@ -141,23 +141,26 @@ const vertexShader = /* glsl */ `
     float midEase = pow(uMid, 1.5);
     float highEase = pow(uHigh, 1.4);
 
+    // All wave time multipliers halved — the previous speed felt
+    // hectic. Slow ocean now: big swells over ~15 seconds, chop
+    // ~6-8 seconds, ripples ~3-4 seconds.
     float bigSwell =
-      sin(dot(vec2(1.0, 0.2), position.xy) * 0.28 + uTime * 0.8) *
+      sin(dot(vec2(1.0, 0.2), position.xy) * 0.28 + uTime * 0.4) *
       (0.14 + bassEase * 1.3);
     float crossSwell =
-      sin(dot(vec2(0.3, 1.0), position.xy) * 0.34 + uTime * 0.55 + 1.7) *
+      sin(dot(vec2(0.3, 1.0), position.xy) * 0.34 + uTime * 0.28 + 1.7) *
       (0.10 + bassEase * 0.85);
     float chop1 =
-      sin(dot(vec2(0.7, -0.7), position.xy) * 0.9 + uTime * 1.4 + 0.5) *
+      sin(dot(vec2(0.7, -0.7), position.xy) * 0.9 + uTime * 0.7 + 0.5) *
       (0.05 + midEase * 0.9);
     float chop2 =
-      sin(dot(vec2(-0.5, 0.85), position.xy) * 1.05 + uTime * 1.7 + 3.0) *
+      sin(dot(vec2(-0.5, 0.85), position.xy) * 1.05 + uTime * 0.85 + 3.0) *
       (0.04 + midEase * 0.7);
     float ripple1 =
-      sin(dot(vec2(0.9, 0.4), position.xy) * 2.2 + uTime * 2.9) *
+      sin(dot(vec2(0.9, 0.4), position.xy) * 2.2 + uTime * 1.45) *
       (0.025 + highEase * 0.35);
     float ripple2 =
-      sin(dot(vec2(-0.6, 0.8), position.xy) * 2.8 + uTime * 3.3 + 2.2) *
+      sin(dot(vec2(-0.6, 0.8), position.xy) * 2.8 + uTime * 1.65 + 2.2) *
       (0.02 + highEase * 0.25);
 
     // Sum the wave layers.
@@ -243,8 +246,14 @@ const fragmentShader = /* glsl */ `
     line *= lineJitter;
     line *= depthFade;
 
-    // Right-side mask so the type column on the left stays clean.
-    float rightMask = smoothstep(-2.5, 2.5, vWorldPos.x);
+    // Right-side mask, softened. Previously cut lines to 0 on the far
+    // left; the hero now sits IN FRONT of faint waves rather than
+    // beside them, so lines bleed leftward at ~25% opacity. Far right
+    // is still full strength; far left floors at 0.25 so the wordmark
+    // reads against a faint continuation of the wave field, not a
+    // hard cutoff. Surface fill still uses the same mask, so the
+    // mesh shading dims in lockstep.
+    float rightMask = mix(0.25, 1.0, smoothstep(-2.5, 2.5, vWorldPos.x));
     line *= rightMask;
 
     // ---- SURFACE FILL ----

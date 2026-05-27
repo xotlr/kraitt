@@ -5,10 +5,12 @@ import {
   Bloom,
   ChromaticAberration,
   EffectComposer,
-  Noise,
+  HueSaturation,
+  SMAA,
+  ToneMapping,
   Vignette,
 } from "@react-three/postprocessing";
-import { BlendFunction, KernelSize } from "postprocessing";
+import { BlendFunction, KernelSize, ToneMappingMode } from "postprocessing";
 import { useMemo } from "react";
 import * as THREE from "three";
 import { useDeviceCapability } from "@/hooks/use-device-capability";
@@ -19,14 +21,18 @@ import { Terrain } from "./terrain";
 /**
  * Scene composition:
  *   1. Atmosphere — fullscreen OLED-black backdrop + film grain
- *   2. Terrain — 3D plane with vertex-displaced FBM, fragment-drawn
- *      gold contour lines. Real perspective camera tilted ~17° down
- *      so the field reads as a landscape receding into the distance.
+ *   2. Terrain — 3D plane with vertex-displaced waves
+ *   3. CameraRig — scroll-driven dolly
  *
- * The atmosphere uses its own bypassed camera (full-screen quad with
- * gl_Position written directly). The terrain uses the regular Three
- * camera. They compose because the atmosphere renders first
- * (renderOrder=-1) and the terrain alpha-blends on top.
+ * Post-processing stack (tuned per VFX audit):
+ *   - SMAA       — line-edge antialiasing (cheap, huge ROI on contours)
+ *   - Bloom      — SELECTIVE glow on bright wave crests only
+ *   - ToneMapping (ACES) — filmic highlight roll-off (no clip)
+ *   - HueSaturation — slight desaturation for film-stock feel
+ *   - ChromaticAberration — subtle RGB fringe at edges only
+ *   - Vignette   — restrained edge darkening
+ *
+ * Removed: Noise post pass (was doubling with atmosphere shader grain).
  */
 export function Scene() {
   const { tier, reducedMotion } = useDeviceCapability();
@@ -47,21 +53,19 @@ export function Scene() {
           antialias: true,
           alpha: false,
           powerPreference: "high-performance",
+          // Renderer tonemapping disabled — we use the ToneMapping
+          // EFFECT in the composer instead so it operates on the
+          // post-bloom buffer (correct order for filmic highlights).
           toneMapping: THREE.NoToneMapping,
           outputColorSpace: THREE.SRGBColorSpace,
         }}
         camera={{
-          // Camera sits 0.8 wu above the ground, looking 17° down with
-          // ~3.5 wu of forward offset. This gives a low landscape
-          // framing — horizon in the upper third, terrain stretches
-          // into the distance.
           position: [0, 0.8, 3.5],
           fov: 55,
           near: 0.1,
           far: 30,
         }}
         onCreated={({ camera }) => {
-          // Tilt camera ~17° down toward a point on the ground ahead.
           camera.lookAt(0, -0.2, -2.5);
         }}
         frameloop={reducedMotion ? "demand" : "always"}
@@ -71,50 +75,61 @@ export function Scene() {
         <Terrain />
         <CameraRig />
 
-        {/* Bloom is the "colorful gaussian blur" that makes the
-            terrain lines glow softly instead of reading as crisp
-            wireframe. Threshold is low (0.05) so the cool-cream
-            lines pick up bloom even at default brightness. Kernel
-            HUGE for soft, hazy spread. Intensity moderate. */}
         <EffectComposer multisampling={0}>
-          {/* No DepthOfField here. Edge blur is applied on the DOM
-              <main> instead (SVG feGaussianBlur masked by a radial
-              gradient) so both canvas AND text blur at edges. */}
-          {/* Bloom — bumped from 0.9 to 1.3 for more glow. */}
+          {/* SMAA — subpixel morphological AA. Lines on the terrain
+              were shimmering at oblique angles; SMAA is cheap (< 1ms
+              at 1080p) and fixes that. Runs before everything else
+              so subsequent passes operate on a clean image. */}
+          <SMAA />
+
+          {/* Bloom — selective per the audit. Threshold raised so
+              only the BRIGHTEST contour peaks bloom (not the entire
+              field). intensity 1.3 -> 0.8, threshold 0.025 -> 0.18,
+              kernel HUGE -> LARGE. Result: lines stay crisp, brightest
+              crests get a soft glow halo. */}
           <Bloom
-            intensity={1.3}
-            kernelSize={KernelSize.HUGE}
-            luminanceThreshold={0.025}
-            luminanceSmoothing={0.8}
+            intensity={0.8}
+            kernelSize={KernelSize.LARGE}
+            luminanceThreshold={0.18}
+            luminanceSmoothing={0.4}
             mipmapBlur
             blendFunction={BlendFunction.SCREEN}
           />
-          {/* Chromatic aberration with radial modulation re-enabled.
-              At center the offset goes to zero (modulationOffset 0.35
-              means falloff starts at 35% from center, so the inner
-              third stays clean). Beyond that, the offset ramps up to
-              its full value — visible RGB split at edges, type stays
-              sharp in the center. */}
+
+          {/* ToneMapping (ACES filmic) AFTER bloom — gives bright
+              bloom peaks a filmic shoulder so they don't clip to
+              flat white. Standard cinematic move. */}
+          <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+
+          {/* Slight desaturation for film-stock feel. -8% saturation
+              + a tiny cool hue shift. Very subtle; pushes the warm
+              cream lines toward a film-print neutral. */}
+          <HueSaturation saturation={-0.08} hue={-0.02} />
+
+          {/* Chromatic aberration — pulled WAY back per audit.
+              modulationOffset 0.35 -> 0.6 means the inner 60% of the
+              frame stays clean; only the outer ring fringes. Offset
+              0.0024 -> 0.0015 reduces the fringe magnitude.
+              The DOM-side SVG CA filter no longer exists (it broke
+              backdrop-filter edge blur), so this is the only CA. */}
           <ChromaticAberration
-            offset={new THREE.Vector2(0.0024, 0.0024)}
+            offset={new THREE.Vector2(0.0015, 0.0015)}
             radialModulation
-            modulationOffset={0.35}
+            modulationOffset={0.6}
             blendFunction={BlendFunction.NORMAL}
           />
-          {/* Vignette — subtle edge darkening so the frame reads
-              like a film still. ~30% darker at edges, clean center. */}
+
+          {/* Vignette — restrained per audit. darkness 0.5 -> 0.3 so
+              corners darken without crushing to true black. */}
           <Vignette
-            offset={0.3}
-            darkness={0.5}
+            offset={0.4}
+            darkness={0.3}
             blendFunction={BlendFunction.NORMAL}
           />
-          {/* Cinematic noise post pass — very subtle, sits on top of
-              the atmosphere shader's grain for a "film stock" feel. */}
-          <Noise
-            premultiply
-            opacity={0.025}
-            blendFunction={BlendFunction.OVERLAY}
-          />
+
+          {/* No Noise pass — atmosphere shader already does film
+              grain procedurally at 2Hz. The OVERLAY post-pass was
+              doubling that and shifting hue. Removed. */}
         </EffectComposer>
       </Canvas>
     </div>

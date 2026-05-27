@@ -142,15 +142,18 @@
     text-wrap: pretty;
   }
 
-  /* Readability overlay — dims the left half of the viewport where
-     the type column sits, fading to transparent over the terrain on
-     the right. Sits BETWEEN the WebGL canvas (z:-10) and the DOM
-     content (z:default 0+), so it darkens the visual without
-     dimming the type itself.
+  /* Readability overlay — softens the left half of the viewport
+     where the type column sits, fading to transparent over the
+     terrain on the right. Sits BETWEEN the WebGL canvas (z:-10) and
+     the DOM content (z:default 0+), so it darkens the visual
+     without dimming the type itself.
 
-     Linear gradient: opaque-ish black on the left (~45% alpha), full
-     transparent past 60% of viewport width — terrain still shows
-     bright on the right. */
+     Previously 0.85 on the far left, which fully suppressed the
+     terrain bleed-through. Now 0.60 so the faint waves (driven by
+     the softened rightMask in terrain.tsx) read through the type
+     column — the hero composes WITH the terrain rather than sitting
+     beside it. Type still wins legibility because the gradient is
+     darker than the line opacity behind it. */
   .atmos::before {
     content: "";
     position: fixed;
@@ -159,9 +162,9 @@
     z-index: -5;
     background: linear-gradient(
       to right,
-      rgba(0, 0, 0, 0.85) 0%,
-      rgba(0, 0, 0, 0.7) 35%,
-      rgba(0, 0, 0, 0.35) 65%,
+      rgba(0, 0, 0, 0.6) 0%,
+      rgba(0, 0, 0, 0.5) 35%,
+      rgba(0, 0, 0, 0.25) 65%,
       rgba(0, 0, 0, 0) 95%
     );
   }

@@ -64,7 +64,7 @@ export function Nav() {
         >
           sk
         </a>
-        <ul className="hidden md:flex gap-8">
+        <ul className="hidden md:flex gap-5 lg:gap-8">
           {sections.slice(1).map((s) => (
             <li key={s.id}>
               <a
@@ -89,7 +89,7 @@ export function Nav() {
             </li>
           ))}
         </ul>
-        <div className="hidden md:flex items-center gap-7">
+        <div className="hidden lg:flex items-center gap-7">
           <AudioToggles />
           <a
             href="mailto:hello@sufiankraitt.com"
@@ -98,6 +98,15 @@ export function Nav() {
             hello@sufiankraitt.com
           </a>
         </div>
+        {/* Tablet-range fallback: section links are visible at md, but the
+            audio/email block only at lg. Show a single compact email link
+            at md so the right side of the bar isn't empty. */}
+        <a
+          href="mailto:hello@sufiankraitt.com"
+          className="hidden md:inline-flex lg:hidden text-ink-muted hover:text-ink transition-colors"
+        >
+          E-Mail
+        </a>
       </div>
     </motion.nav>
   );

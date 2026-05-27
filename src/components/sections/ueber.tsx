@@ -1,7 +1,33 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import { SectionHeading } from "@/components/section-heading";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+const stagger: Variants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+const fadeUp: Variants = {
+  hidden: { opacity: 0, y: 18 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.9, ease: EASE },
+  },
+};
+
+const drawX: Variants = {
+  hidden: { scaleX: 0 },
+  visible: { scaleX: 1, transition: { duration: 0.9, ease: EASE } },
+};
 
 const facts = [
   { k: "Basis", v: "Wien, AT" },
@@ -31,50 +57,56 @@ export function Ueber() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            variants={stagger}
+            initial="hidden"
+            whileInView="visible"
             viewport={{ once: true, margin: "-10%" }}
-            transition={{ duration: 1, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
             className="lg:col-span-7 lg:col-start-2 space-y-7 text-body-lg leading-[var(--text-body-lg--line-height)] text-ink/80 font-body text-pretty"
           >
-            <p>
+            <motion.p variants={fadeUp}>
               Mein Weg in die Audiowelt begann mit der Frage, warum manche
               Aufnahmen{" "}
               <span className="font-serif-italic text-ink">da</span> sind und
               andere nicht. Heute arbeite ich an dieser Antwort jeden Tag —
               zwischen Tonangel und Mischpult, zwischen Set und Studio.
-            </p>
-            <p>
+            </motion.p>
+            <motion.p variants={fadeUp}>
               Nach meinem Abschluss am{" "}
               <span className="font-serif-italic text-ink">SAE Institute</span>{" "}
               habe ich mich auf den schmalen Grat zwischen technischer
               Präzision und gestalterischer Intuition spezialisiert. Film und TV
               verlangen Disziplin und Geschwindigkeit; Musik verlangt Geduld und
               Haltung. Beides interessiert mich gleichermaßen.
-            </p>
-            <p className="text-ink-muted">
+            </motion.p>
+            <motion.p variants={fadeUp} className="text-ink-muted">
               Ich arbeite für ORF-Produktionen, Spielfilme, Kurzfilme,
               Dokumentationen und für Bands, die wissen, dass ein Song sich
               entscheidet, bevor er gemischt wird.
-            </p>
+            </motion.p>
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            variants={stagger}
+            initial="hidden"
+            whileInView="visible"
             viewport={{ once: true, margin: "-10%" }}
-            transition={{ duration: 1, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
             className="lg:col-span-3 lg:col-start-10"
           >
             <dl className="space-y-4 font-mono text-[10px] uppercase tracking-[0.18em]">
               {facts.map((f) => (
-                <div
+                <motion.div
                   key={f.k}
-                  className="flex justify-between border-b border-hairline pb-3"
+                  variants={fadeUp}
+                  className="relative flex justify-between pb-3"
                 >
                   <dt className="text-ink-faint">{f.k}</dt>
                   <dd className="text-ink/85">{f.v}</dd>
-                </div>
+                  <motion.span
+                    variants={drawX}
+                    style={{ transformOrigin: "left center" }}
+                    className="absolute inset-x-0 bottom-0 h-px bg-hairline"
+                  />
+                </motion.div>
               ))}
             </dl>
           </motion.div>

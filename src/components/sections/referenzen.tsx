@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, type Variants } from "framer-motion";
 import { useMemo, useState } from "react";
 import { SectionHeading } from "@/components/section-heading";
 import {
@@ -16,6 +16,51 @@ import {
   type Project,
 } from "@/data/projects";
 import { cn } from "@/lib/utils";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+const filterStagger: Variants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.05,
+    },
+  },
+};
+
+const fadeUp: Variants = {
+  hidden: { opacity: 0, y: 14 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.8, ease: EASE },
+  },
+};
+
+const drawX: Variants = {
+  hidden: { scaleX: 0 },
+  visible: { scaleX: 1, transition: { duration: 1, ease: EASE } },
+};
+
+const listContainer: Variants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.05,
+    },
+  },
+};
+
+const rowVariants: Variants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.8, ease: EASE },
+  },
+};
 
 export function Referenzen() {
   const [filter, setFilter] = useState<Category | "all">("all");
@@ -47,17 +92,18 @@ export function Referenzen() {
         />
 
         <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8 }}
+          variants={filterStagger}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-10%" }}
           className="mb-14 flex flex-wrap gap-x-8 gap-y-3 font-mono text-[10px] uppercase tracking-[0.22em]"
         >
           {categories.map((c) => {
             const isActive = filter === c.id;
             return (
-              <button
+              <motion.button
                 key={c.id}
+                variants={fadeUp}
                 onClick={() => setFilter(c.id)}
                 className={cn(
                   "relative pb-1.5 transition-colors duration-500",
@@ -72,57 +118,85 @@ export function Referenzen() {
                     transition={{ type: "spring", stiffness: 350, damping: 30 }}
                   />
                 )}
-              </button>
+              </motion.button>
             );
           })}
-          <span className="ml-auto text-ink-faint">
+          <motion.span variants={fadeUp} className="ml-auto text-ink-faint">
             {String(visible.length).padStart(2, "0")} /{" "}
             {String(projects.length).padStart(2, "0")}
-          </span>
+          </motion.span>
         </motion.div>
 
-        <ul className="border-t border-hairline">
-          <AnimatePresence mode="popLayout">
-            {visible.map((p, i) => (
-              <motion.li
-                key={p.id}
-                layout
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                transition={{
-                  duration: 0.7,
-                  delay: i * 0.04,
-                  ease: [0.22, 1, 0.36, 1],
-                }}
-                className="border-b border-hairline"
-              >
-                <button
-                  onClick={() => setActive(p)}
-                  className="group relative w-full text-left py-8 md:py-10 grid grid-cols-12 gap-4 items-baseline"
+        <motion.div
+          variants={listContainer}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-10%" }}
+          className="relative"
+        >
+          <motion.span
+            variants={drawX}
+            style={{ transformOrigin: "left center" }}
+            className="absolute inset-x-0 top-0 h-px bg-hairline"
+          />
+          <ul>
+            <AnimatePresence mode="popLayout">
+              {visible.map((p, i) => (
+                <motion.li
+                  key={p.id}
+                  layout
+                  variants={rowVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit={{ opacity: 0, y: -12, transition: { duration: 0.4, ease: EASE } }}
+                  className="relative"
                 >
-                  <span className="col-span-1 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-faint">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <span className="col-span-12 md:col-span-5 font-heading text-2xl md:text-[2rem] transition-colors duration-500 group-hover:text-ink">
-                    {p.title}
-                  </span>
-                  <span className="col-span-6 md:col-span-3 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
-                    {p.role}
-                  </span>
-                  <span className="col-span-3 md:col-span-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
-                    {p.medium.split(" — ")[0]}
-                  </span>
-                  <span className="col-span-3 md:col-span-1 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint text-right">
-                    {p.year}
-                  </span>
+                  <button
+                    onClick={() => setActive(p)}
+                    className="group relative w-full text-left py-6 md:py-10 lg:grid lg:grid-cols-12 lg:gap-4 lg:items-baseline"
+                  >
+                    {/* Mobile/tablet layout: index + year pinned at top,
+                        title below, then a single mono meta row. The
+                        12-col grid used at lg+ wraps awkwardly under
+                        ~900px because role/medium/year all try to fit
+                        on one line beside the title. Stacking is
+                        cleaner and reads faster on small screens. */}
+                    <div className="flex items-baseline justify-between lg:hidden mb-2">
+                      <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-faint">
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">
+                        {p.year}
+                      </span>
+                    </div>
+                    <span className="hidden lg:block lg:col-span-1 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-faint">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <span className="block lg:col-span-5 font-heading text-2xl md:text-[2rem] transition-colors duration-500 group-hover:text-ink">
+                      {p.title}
+                    </span>
+                    <span className="mt-3 lg:mt-0 block lg:col-span-3 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+                      {p.role}
+                    </span>
+                    <span className="mt-1 lg:mt-0 block lg:col-span-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+                      {p.medium.split(" — ")[0]}
+                    </span>
+                    <span className="hidden lg:block lg:col-span-1 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint text-right">
+                      {p.year}
+                    </span>
 
-                  <span className="pointer-events-none absolute inset-x-0 -bottom-px h-px bg-ink/50 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]" />
-                </button>
-              </motion.li>
-            ))}
-          </AnimatePresence>
-        </ul>
+                    <span className="pointer-events-none absolute inset-x-0 -bottom-px h-px bg-ink/50 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]" />
+                  </button>
+                  <motion.span
+                    variants={drawX}
+                    style={{ transformOrigin: "left center" }}
+                    className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-hairline"
+                  />
+                </motion.li>
+              ))}
+            </AnimatePresence>
+          </ul>
+        </motion.div>
       </div>
 
       <Dialog open={!!active} onOpenChange={(o) => !o && setActive(null)}>

@@ -24,7 +24,12 @@ export function VolumeSlider() {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -16 }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          className="fixed left-6 top-1/2 -translate-y-1/2 z-40 flex flex-col items-center gap-4 pointer-events-auto"
+          // Hidden on mobile/tablet — the slider lives on the left edge
+          // where it would overlap the type column at narrow widths. The
+          // audio toggles in the (md+) nav remain available for play/pause;
+          // a fine-grained fader only earns its viewport real estate on
+          // wider screens where the gutter accommodates it.
+          className="hidden lg:flex fixed left-6 top-1/2 -translate-y-1/2 z-40 flex-col items-center gap-4 pointer-events-auto"
         >
           {/* mono label, eyebrow style */}
           <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-ink-muted">

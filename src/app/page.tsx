@@ -9,13 +9,14 @@ export default function Home() {
   return (
     <>
       <Nav />
-      {/* CA filter on <main> only. Excludes Nav (above) which is
-          position:fixed; CSS `filter:` creates a new containing block
-          that would break that. willChange hints compositor. */}
-      <main
-        className="relative z-10"
-        style={{ filter: "url(#ca)", willChange: "filter" }}
-      >
+      {/* No DOM CA filter here — the SVG `#ca` filter from layout.tsx
+          would flatten this subtree into its own composited layer
+          and the edge-blur overlay (using backdrop-filter) cannot
+          read through that. Picking edge-blur over DOM CA because
+          the lens-defocus effect is more impactful for cinematic
+          feel. The WebGL canvas still has its own ChromaticAberration
+          post-pass, so the terrain itself fringes. */}
+      <main className="relative z-10">
         <Hero />
         <Ueber />
         <Leistungen />
