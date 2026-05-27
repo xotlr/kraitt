@@ -15,6 +15,13 @@ import { useScrollViewport } from "@/lib/scroll-context";
  */
 export function PageScroll({ children }: { children: ReactNode }) {
   const viewportRef = useScrollViewport();
+  // CA filter is applied via the `.ca-text` class in page.tsx /
+  // sections, NOT here on the scroll wrapper. Earlier we wrapped the
+  // whole scroll content in `filter: url(#ca)`, but CSS filter
+  // creates a new containing block which broke position:fixed on the
+  // Nav (the nav lives inside this scroll content). Scoping the
+  // filter to the body sections only lets the Nav stay fixed to the
+  // viewport.
   return (
     <ScrollArea className="h-svh" viewportRef={viewportRef}>
       {children}

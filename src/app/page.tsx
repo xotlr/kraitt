@@ -9,7 +9,13 @@ export default function Home() {
   return (
     <>
       <Nav />
-      <main className="relative z-10">
+      {/* CA filter on <main> only. Excludes Nav (above) which is
+          position:fixed; CSS `filter:` creates a new containing block
+          that would break that. willChange hints compositor. */}
+      <main
+        className="relative z-10"
+        style={{ filter: "url(#ca)", willChange: "filter" }}
+      >
         <Hero />
         <Ueber />
         <Leistungen />

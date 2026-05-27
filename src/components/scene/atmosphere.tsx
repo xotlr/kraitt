@@ -120,10 +120,7 @@ const fragmentShader = /* glsl */ `
     vec2 p = uv;
     p.x *= uResolution.x / uResolution.y;
 
-    // OLED black backdrop. The shader is back to a pure background
-    // role now that the terrain (terrain.tsx) draws the actual lines.
-    // We keep a faint warm pocket in the deepest noise valleys for
-    // the slightest sense of atmosphere; everywhere else is true 0.
+    // OLED black bed + sparse warm pockets.
     float t = uTime * 0.04;
     float n = fbm(vec3(p * 1.4, t));
     vec3 bg = vec3(0.0);
@@ -132,12 +129,11 @@ const fragmentShader = /* glsl */ `
     float pocketBoost = 1.0 + uBass * 0.6;
     vec3 col = mix(bg, pocketColor * pocketBoost, pocket);
 
-    // Film grain — bumped intensity 0.045 -> 0.07 per request for
-    // visible noise overlay. Single grain cell per ~2 screen pixels;
-    // fract(time*100) re-rolls every frame for film-stock twinkle.
+    // Film grain — 2Hz re-roll, low amplitude. Subtle texture rather
+    // than visible flicker.
     float grainSize = 2.0;
-    vec2 gridPos = uv * uResolution / grainSize + fract(uTime * 100.0);
-    float grain = (hash(gridPos) - 0.5) * 0.07;
+    vec2 gridPos = uv * uResolution / grainSize + fract(uTime * 2.0);
+    float grain = (hash(gridPos) - 0.5) * 0.022;
     col += grain;
 
     col = max(col, vec3(0.0));

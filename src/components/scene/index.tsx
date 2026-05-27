@@ -1,7 +1,13 @@
 "use client";
 
 import { Canvas } from "@react-three/fiber";
-import { Bloom, EffectComposer } from "@react-three/postprocessing";
+import {
+  Bloom,
+  ChromaticAberration,
+  EffectComposer,
+  Noise,
+  Vignette,
+} from "@react-three/postprocessing";
 import { BlendFunction, KernelSize } from "postprocessing";
 import { useMemo } from "react";
 import * as THREE from "three";
@@ -71,13 +77,43 @@ export function Scene() {
             lines pick up bloom even at default brightness. Kernel
             HUGE for soft, hazy spread. Intensity moderate. */}
         <EffectComposer multisampling={0}>
+          {/* No DepthOfField here. Edge blur is applied on the DOM
+              <main> instead (SVG feGaussianBlur masked by a radial
+              gradient) so both canvas AND text blur at edges. */}
+          {/* Bloom — bumped from 0.9 to 1.3 for more glow. */}
           <Bloom
-            intensity={0.55}
+            intensity={1.3}
             kernelSize={KernelSize.HUGE}
-            luminanceThreshold={0.05}
-            luminanceSmoothing={0.7}
+            luminanceThreshold={0.025}
+            luminanceSmoothing={0.8}
             mipmapBlur
             blendFunction={BlendFunction.SCREEN}
+          />
+          {/* Chromatic aberration with radial modulation re-enabled.
+              At center the offset goes to zero (modulationOffset 0.35
+              means falloff starts at 35% from center, so the inner
+              third stays clean). Beyond that, the offset ramps up to
+              its full value — visible RGB split at edges, type stays
+              sharp in the center. */}
+          <ChromaticAberration
+            offset={new THREE.Vector2(0.0024, 0.0024)}
+            radialModulation
+            modulationOffset={0.35}
+            blendFunction={BlendFunction.NORMAL}
+          />
+          {/* Vignette — subtle edge darkening so the frame reads
+              like a film still. ~30% darker at edges, clean center. */}
+          <Vignette
+            offset={0.3}
+            darkness={0.5}
+            blendFunction={BlendFunction.NORMAL}
+          />
+          {/* Cinematic noise post pass — very subtle, sits on top of
+              the atmosphere shader's grain for a "film stock" feel. */}
+          <Noise
+            premultiply
+            opacity={0.025}
+            blendFunction={BlendFunction.OVERLAY}
           />
         </EffectComposer>
       </Canvas>
