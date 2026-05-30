@@ -11,7 +11,7 @@ import {
   Vignette,
 } from "@react-three/postprocessing";
 import { BlendFunction, KernelSize, ToneMappingMode } from "postprocessing";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 import { useDeviceCapability } from "@/hooks/use-device-capability";
 import { Atmosphere } from "./atmosphere";
@@ -27,7 +27,7 @@ import { Terrain } from "./terrain";
  * Post-processing stack (tuned per VFX audit):
  *   - SMAA       — line-edge antialiasing (cheap, huge ROI on contours)
  *   - Bloom      — SELECTIVE glow on bright wave crests only
- *   - ToneMapping (ACES) — filmic highlight roll-off (no clip)
+ *   - ToneMapping (AgX) — filmic roll-off with a true black point
  *   - HueSaturation — slight desaturation for film-stock feel
  *   - ChromaticAberration — subtle RGB fringe at edges only
  *   - Vignette   — restrained edge darkening
@@ -42,6 +42,22 @@ export function Scene() {
     if (typeof window === "undefined") return 1;
     return window.innerWidth < 1024 ? 1 : [1, 1.5];
   }, []);
+
+  // Pause rendering when the tab is backgrounded. r3f keeps running rAF in a
+  // hidden tab otherwise, burning GPU/battery on a scene nobody can see. We
+  // flip frameloop to "demand" (holds the last frame, no rAF) while hidden
+  // and restore it on return. Restoring to "always" unless reduced-motion,
+  // which always wants "demand". (CLAUDE.md §3 — previously NOT ENFORCED.)
+  const [tabHidden, setTabHidden] = useState(false);
+  useEffect(() => {
+    const onVisibility = () => setTabHidden(document.hidden);
+    document.addEventListener("visibilitychange", onVisibility);
+    onVisibility(); // sync initial state (e.g. mounted in a bg tab)
+    return () =>
+      document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
+  const frameloop: "always" | "demand" =
+    reducedMotion || tabHidden ? "demand" : "always";
 
   if (skip) return null;
 
@@ -73,7 +89,7 @@ export function Scene() {
         onCreated={({ camera }) => {
           camera.lookAt(0, -0.2, -2.5);
         }}
-        frameloop={reducedMotion ? "demand" : "always"}
+        frameloop={frameloop}
         // Token, not hardcoded black, so the canvas clear matches the
         // theme during the load gap before the atmosphere mesh paints.
         style={{ background: "var(--color-canvas)" }}

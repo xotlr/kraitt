@@ -1,6 +1,6 @@
 "use client";
 
-import { Microphone, MusicNotes } from "@phosphor-icons/react";
+import { Microphone, Pause, Play } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
 import { SECTIONS } from "@/components/console/controls";
 import { LanguageToggle } from "@/components/console/language-toggle";
@@ -72,10 +72,16 @@ export function ConsolePanel() {
             ariaLabel={
               musicStatus === "unavailable"
                 ? "Musik — nicht verfügbar"
-                : "Musik"
+                : musicOn
+                  ? "Pause"
+                  : "Wiedergabe"
             }
           >
-            <MusicNotes size={20} weight={musicOn ? "fill" : "regular"} />
+            {musicOn ? (
+              <Pause size={20} weight="fill" />
+            ) : (
+              <Play size={20} weight="fill" />
+            )}
           </StudioButton>
           <StudioButton
             active={micOn}

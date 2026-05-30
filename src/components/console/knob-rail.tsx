@@ -60,7 +60,7 @@ export function KnobRail() {
           settings group below is intentionally OUTSIDE this <nav> so AT
           users find section links here and site controls as their own
           group, not unexpectedly inside navigation. */}
-      <nav aria-label="Sektionen" className="flex flex-col items-center gap-5">
+      <nav aria-label="Sektionen" className="flex flex-col items-center gap-3">
         {SECTIONS.map((s) => {
           const Icon = s.icon;
           const isActive = active === s.id;
@@ -86,7 +86,7 @@ export function KnobRail() {
         variants={item}
         role="group"
         aria-label="Einstellungen"
-        className="flex flex-col items-center gap-5"
+        className="flex flex-col items-center gap-3"
       >
         <ThemeToggle iconSize={24} />
         {/* Language toggle — flag switch. Functional state (persists, sets

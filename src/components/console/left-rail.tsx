@@ -1,6 +1,6 @@
 "use client";
 
-import { Microphone, MusicNotes } from "@phosphor-icons/react";
+import { Microphone, Pause, Play } from "@phosphor-icons/react";
 import { motion, type Variants } from "framer-motion";
 import { ChannelStrip } from "@/components/console/level-meter";
 import { StudioButton } from "@/components/console/studio-button";
@@ -34,7 +34,7 @@ export function LeftRail() {
       variants={rail}
       initial="hidden"
       animate="show"
-      className="hidden lg:flex shrink-0 flex-col items-center gap-5"
+      className="hidden lg:flex shrink-0 flex-col items-center gap-3"
       style={{
         width: "var(--console-left-rail-w)",
         paddingTop: "var(--console-rail-inset)",
@@ -55,9 +55,9 @@ export function LeftRail() {
       </motion.a>
 
       {/* Source select — the two inputs feeding the strip. Colour-coded by
-          function: MUS is playback (green when live), MIC is a record/input
-          source (red when live), the way a desk colours its caps. Small
-          mono labels name them like a channel-strip source row. */}
+          function: the music TRANSPORT plays/pauses the track (green when
+          playing), MIC is a record/input source (red when live), the way a
+          desk colours its caps. */}
       <motion.div variants={item}>
         <StudioButton
           active={musicOn}
@@ -66,10 +66,20 @@ export function LeftRail() {
           disabled={musicStatus === "unavailable"}
           onClick={toggleMusic}
           ariaLabel={
-            musicStatus === "unavailable" ? "Musik — nicht verfügbar" : "Musik"
+            musicStatus === "unavailable"
+              ? "Musik — nicht verfügbar"
+              : musicOn
+                ? "Pause"
+                : "Wiedergabe"
           }
         >
-          <MusicNotes size={24} weight={musicOn ? "fill" : "regular"} />
+          {/* Transport: Play when stopped, Pause when playing. Filled
+              weight so the glyph reads as a solid transport cap. */}
+          {musicOn ? (
+            <Pause size={22} weight="fill" />
+          ) : (
+            <Play size={22} weight="fill" />
+          )}
         </StudioButton>
       </motion.div>
       <motion.div variants={item}>

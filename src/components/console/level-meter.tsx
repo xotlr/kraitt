@@ -44,6 +44,25 @@ const AMBER_DB = -18;
 // visible unlit), low enough that lit segments clearly pop above it.
 const IDLE_OPACITY = 0.28;
 
+// Fader detents — the volume snaps to these notches so the cap settles on
+// defined positions with a soft step rather than drifting to any analog
+// value. 0 / 0.25 / 0.5 / 0.75 (unity) / 1.0 plus the halves between, so
+// it lands on clean, musically-sensible stops.
+const FADER_STOPS = [0, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.85, 1];
+/** Snap a raw 0..1 value to the nearest detent. */
+function snapVolume(v: number): number {
+  let best = FADER_STOPS[0];
+  let bestD = Math.abs(v - best);
+  for (const s of FADER_STOPS) {
+    const d = Math.abs(v - s);
+    if (d < bestD) {
+      best = s;
+      bestD = d;
+    }
+  }
+  return best;
+}
+
 /** Map a 0..1 reactive level to dBFS on our floor..0 scale. */
 function levelToDb(level: number): number {
   if (level <= 0) return FLOOR_DB;
@@ -136,8 +155,10 @@ export function ChannelStrip() {
         // tight coloured halo so they pop out of the recessed black window.
         // Unlit segments are flat (no glow) so only the live level glows.
         if (lit) {
-          el.style.filter = "brightness(1.5) saturate(1.15)";
-          el.style.boxShadow = "0 0 5px currentColor, 0 0 2px currentColor";
+          // Gentle lift only — keep the muted hue, just make it read as
+          // "on" with a soft halo rather than a vivid candy LED.
+          el.style.filter = "brightness(1.25)";
+          el.style.boxShadow = "0 0 4px currentColor";
         } else {
           el.style.filter = "none";
           el.style.boxShadow = "none";
@@ -178,9 +199,13 @@ export function ChannelStrip() {
       className="channel-strip relative h-full w-full"
       style={
         {
-          "--meter-green": "#5ec27a",
-          "--meter-amber": "#d8a23a",
-          "--meter-red": "#e0524e",
+          // Muted zone colours — desaturated, dustier hues so the meter
+          // reads as a refined instrument display rather than candy LEDs.
+          // Still clearly green / amber / red, just toned down to sit in
+          // the dark, cinematic palette.
+          "--meter-green": "#6e9b78",
+          "--meter-amber": "#bd9856",
+          "--meter-red": "#bf6b62",
         } as React.CSSProperties
       }
     >
@@ -191,7 +216,7 @@ export function ChannelStrip() {
           anodized metal without leaving the OLED-black brand. Two screws
           at top/bottom sell it as a bolted-on panel. */}
       <div
-        className="absolute inset-0 flex gap-1 rounded-[8px] px-1.5 py-2.5"
+        className="absolute inset-0 flex gap-1 rounded-[12px] px-1.5 py-2.5"
         style={{
           // Graphite, just off black, with a faint top→bottom sheen.
           background:
@@ -216,7 +241,7 @@ export function ChannelStrip() {
             75% travel (conventional 0 dB on a +6..-∞ taper). */}
         <div
           className="relative h-full shrink-0"
-          style={{ width: "14px", marginTop: "8px", marginBottom: "8px" }}
+          style={{ width: "16px", marginTop: "8px", marginBottom: "8px" }}
         >
           {/* Routed slot — a deep recessed channel. Dark fill + strong inset
               shadow on all sides reads as a groove milled into the plate. */}
@@ -234,42 +259,60 @@ export function ChannelStrip() {
               ].join(","),
             }}
           />
-          {/* Unity (0 dB) mark — a hairline tick beside the slot at 75%. */}
+          {/* Detent ticks — a hairline notch at each snap stop so the fader's
+              defined positions are visible. Unity (0 dB, 0.75) is brighter
+              and wider, the conventional 0 dB reference on the taper. */}
+          {FADER_STOPS.map((stop) => {
+            const isUnity = stop === 0.75;
+            return (
+              <div
+                key={stop}
+                aria-hidden
+                className="absolute left-1/2 -translate-x-1/2"
+                style={{
+                  bottom: `calc(${SLOT_PAD}px + ${stop} * (100% - ${SLOT_PAD * 2}px))`,
+                  width: isUnity ? "12px" : "8px",
+                  height: "1px",
+                  background: isUnity
+                    ? "color-mix(in srgb, var(--color-ink) 22%, transparent)"
+                    : "color-mix(in srgb, var(--color-ink) 10%, transparent)",
+                }}
+              />
+            );
+          })}
+          {/* The molded cap — rides in the slot. Same machined-graphite
+              language as the buttons (not a bright ink block): a beveled
+              cap just off the canvas, top highlight + bottom shade, with a
+              grip indent line. Rounded to match the buttons. A drop shadow
+              seats it ABOVE the plate and IN the slot; on grab it depresses
+              (translateY) and the shadow tightens. The snap detents give it
+              a soft step as it crosses each notch. */}
           <div
             aria-hidden
-            className="absolute left-0 right-0"
+            className="absolute left-1/2 -translate-x-1/2 rounded-[5px]"
             style={{
-              bottom: `calc(${SLOT_PAD}px + 0.75 * (100% - ${SLOT_PAD * 2}px))`,
-              height: "1px",
-              background: "color-mix(in srgb, white 14%, transparent)",
-            }}
-          />
-          {/* The molded cap — rides in the slot. Top highlight + side
-              shading + a grip indent line read as a thumbed fader knob; a
-              drop shadow seats it ABOVE the plate and IN the slot. On grab
-              it depresses (translateY) and the shadow tightens. */}
-          <div
-            aria-hidden
-            className="absolute left-1/2 -translate-x-1/2 rounded-[3px]"
-            style={{
-              width: "14px",
+              width: "16px",
               height: `${CAP_H}px`,
               bottom: `calc(${volume} * (100% - ${SLOT_PAD * 2}px) + ${SLOT_PAD}px - ${CAP_H / 2}px)`,
+              // Graphite cap, on-brand: barely lifted off the canvas, like a
+              // button. Warm-neutral so it belongs to the desk, not a white chip.
               background:
-                "linear-gradient(180deg, color-mix(in srgb, var(--color-ink) 92%, transparent) 0%, color-mix(in srgb, var(--color-ink) 70%, transparent) 45%, color-mix(in srgb, var(--color-ink) 82%, transparent) 100%)",
+                "linear-gradient(180deg, color-mix(in srgb, var(--color-ink) 26%, var(--color-canvas)) 0%, color-mix(in srgb, var(--color-ink) 14%, var(--color-canvas)) 50%, color-mix(in srgb, var(--color-ink) 20%, var(--color-canvas)) 100%)",
               boxShadow: grabbed
                 ? [
-                    "inset 0 1px 0 color-mix(in srgb, white 30%, transparent)",
+                    "inset 0 1px 0 color-mix(in srgb, white 12%, transparent)",
                     "inset 0 -1px 0 color-mix(in srgb, black 35%, transparent)",
                     "0 1px 1px color-mix(in srgb, black 55%, transparent)",
+                    "0 0 0 1px var(--color-hairline)",
                   ].join(",")
                 : [
-                    "inset 0 1px 0 color-mix(in srgb, white 45%, transparent)",
+                    "inset 0 1px 0 color-mix(in srgb, white 16%, transparent)",
                     "inset 0 -1px 0 color-mix(in srgb, black 30%, transparent)",
-                    "0 2px 3px color-mix(in srgb, black 55%, transparent)",
+                    "0 2px 3px color-mix(in srgb, black 50%, transparent)",
+                    "0 0 0 1px var(--color-hairline)",
                   ].join(","),
               transform: grabbed ? "translateY(0.5px)" : "translateY(0)",
-              transition: "bottom 90ms linear, box-shadow 120ms, transform 120ms",
+              transition: "bottom 110ms cubic-bezier(0.22,1,0.36,1), box-shadow 120ms, transform 120ms",
             }}
           >
             {/* centre grip indent — the molded line you'd thumb */}
@@ -278,8 +321,8 @@ export function ChannelStrip() {
               style={{
                 width: "9px",
                 height: "2px",
-                background: "color-mix(in srgb, black 45%, transparent)",
-                boxShadow: "0 1px 0 color-mix(in srgb, white 30%, transparent)",
+                background: "color-mix(in srgb, black 40%, transparent)",
+                boxShadow: "0 1px 0 color-mix(in srgb, white 14%, transparent)",
               }}
             />
           </div>
@@ -290,13 +333,18 @@ export function ChannelStrip() {
             max={1}
             step={0.01}
             value={volume}
-            onChange={(e) => setVolume(parseFloat(e.target.value))}
+            // Snap to the nearest detent on every change so the cap settles
+            // on defined notches (drag or keyboard) instead of any analog
+            // value. The displayed `value` is already snapped, so the cap
+            // animates to the stop with its eased transition.
+            onChange={(e) => setVolume(snapVolume(parseFloat(e.target.value)))}
             onPointerDown={() => setGrabbed(true)}
             onPointerUp={() => setGrabbed(false)}
             onPointerCancel={() => setGrabbed(false)}
             onFocus={() => setGrabbed(true)}
             onBlur={() => setGrabbed(false)}
             aria-label="Lautstärke (Fader)"
+            aria-valuetext={`${Math.round(volume * 100)} %`}
             className="fader-input absolute inset-0 h-full w-full cursor-ns-resize"
           />
         </div>
@@ -308,7 +356,7 @@ export function ChannelStrip() {
             width even at one-button rail width. Passive — displays the
             live signal, sets nothing. */}
         <div
-          className="relative flex h-full flex-1 flex-col-reverse gap-[2px] overflow-hidden rounded-[4px] p-[3px]"
+          className="relative flex h-full flex-1 flex-col-reverse gap-[2px] overflow-hidden rounded-[7px] p-[3px]"
           style={{
             background:
               "linear-gradient(180deg, color-mix(in srgb, black 50%, transparent), color-mix(in srgb, black 32%, transparent))",
@@ -329,7 +377,7 @@ export function ChannelStrip() {
                 ref={(el) => {
                   segRefs.current[i] = el;
                 }}
-                className="w-full flex-1 rounded-[1.5px] transition-opacity duration-75"
+                className="w-full flex-1 rounded-[3px] transition-opacity duration-75"
                 style={{
                   background: zoneColor(segDb),
                   // color drives currentColor for the lit-segment halo.
