@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAudio, useAudioLevels } from "@/lib/audio";
 
 /**
@@ -42,7 +42,7 @@ const AMBER_DB = -18;
 // Rest brightness of an unlit segment. High enough that the ladder
 // structure + colour zones read at idle (a real LED meter's segments are
 // visible unlit), low enough that lit segments clearly pop above it.
-const IDLE_OPACITY = 0.2;
+const IDLE_OPACITY = 0.28;
 
 /** Map a 0..1 reactive level to dBFS on our floor..0 scale. */
 function levelToDb(level: number): number {
@@ -75,6 +75,12 @@ export function ChannelStrip() {
   const segRefs = useRef<(HTMLDivElement | null)[]>([]);
   const peakRef = useRef<HTMLDivElement>(null);
 
+  // Tactile grab state: while the fader is being dragged (pointer down /
+  // keyboard focus-active), the cap depresses into the slot and its drop
+  // shadow tightens — the difference between a knob you can grab and a
+  // shape painted on the panel.
+  const [grabbed, setGrabbed] = useState(false);
+
   useEffect(() => {
     const reduce = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
@@ -85,7 +91,10 @@ export function ChannelStrip() {
     // unlit LED meter on a powered desk) and the peak tick at the floor.
     const parkDark = () => {
       segRefs.current.forEach((el) => {
-        if (el) el.style.opacity = String(IDLE_OPACITY);
+        if (!el) return;
+        el.style.opacity = String(IDLE_OPACITY);
+        el.style.filter = "none";
+        el.style.boxShadow = "none";
       });
       if (peakRef.current) peakRef.current.style.bottom = "0%";
     };
@@ -121,7 +130,18 @@ export function ChannelStrip() {
         // Segment i spans [i/N, (i+1)/N] of the ladder; lit if the level
         // reaches its lower edge.
         const segPos = i / (segs.length - 1);
-        el.style.opacity = pos >= segPos ? "1" : String(IDLE_OPACITY);
+        const lit = pos >= segPos;
+        el.style.opacity = lit ? "1" : String(IDLE_OPACITY);
+        // Lit segments read as emissive LEDs: brighten the colour and add a
+        // tight coloured halo so they pop out of the recessed black window.
+        // Unlit segments are flat (no glow) so only the live level glows.
+        if (lit) {
+          el.style.filter = "brightness(1.5) saturate(1.15)";
+          el.style.boxShadow = "0 0 5px currentColor, 0 0 2px currentColor";
+        } else {
+          el.style.filter = "none";
+          el.style.boxShadow = "none";
+        }
       }
 
       // Peak hold: capture new peaks instantly, hold ~700ms, then fall.
@@ -146,10 +166,16 @@ export function ChannelStrip() {
     return () => cancelAnimationFrame(raf);
   }, [levels, active]);
 
+  // Cap geometry (px). The slot's travel runs between PAD at top/bottom,
+  // so the cap centre moves within (100% - 2*PAD); we offset by half the
+  // cap height to centre it on the value.
+  const CAP_H = 14;
+  const SLOT_PAD = 6;
+
   return (
     <div
       ref={rootRef}
-      className="channel-strip flex h-full w-full gap-1.5"
+      className="channel-strip relative h-full w-full"
       style={
         {
           "--meter-green": "#5ec27a",
@@ -158,144 +184,193 @@ export function ChannelStrip() {
         } as React.CSSProperties
       }
     >
-      {/* ── FADER ──────────────────────────────────────────────────────
-          A thin recessed track with a real draggable cap. The cap is the
-          set volume; a faint unity (0 dB) mark sits at 75% of travel, the
-          conventional position of a fader's 0 dB on a taper that runs
-          +6 at the top to -∞ at the bottom. */}
-      <div className="relative h-full" style={{ width: "13px" }}>
-        {/* Track slot */}
+      {/* ── FACEPLATE ───────────────────────────────────────────────────
+          A near-black machined plate the fader + meter are MOUNTED INTO.
+          Defined by edge-lit hairlines (top highlight, bottom shade) over
+          a graphite fill barely lifted off true black, so it reads as dark
+          anodized metal without leaving the OLED-black brand. Two screws
+          at top/bottom sell it as a bolted-on panel. */}
+      <div
+        className="absolute inset-0 flex gap-1.5 rounded-[8px] px-1.5 py-2.5"
+        style={{
+          // Graphite, just off black, with a faint top→bottom sheen.
+          background:
+            "linear-gradient(180deg, color-mix(in srgb, var(--color-ink) 7%, var(--color-canvas)) 0%, var(--color-canvas) 55%, color-mix(in srgb, var(--color-ink) 4%, var(--color-canvas)) 100%)",
+          boxShadow: [
+            // top edge highlight + bottom edge shade = machined bevel
+            "inset 0 1px 0 color-mix(in srgb, white 7%, transparent)",
+            "inset 0 -1px 0 color-mix(in srgb, black 40%, transparent)",
+            "0 0 0 1px var(--color-hairline)",
+            // soft lift off the bezel so the plate sits proud
+            "0 2px 6px color-mix(in srgb, black 35%, transparent)",
+          ].join(","),
+        }}
+      >
+        {/* Panel screws — top + bottom, centered on the plate. */}
+        <Screw className="absolute left-1/2 top-1 -translate-x-1/2" />
+        <Screw className="absolute left-1/2 bottom-1 -translate-x-1/2" />
+
+        {/* ── FADER ─────────────────────────────────────────────────────
+            A routed slot cut into the plate with a real molded cap riding
+            in it. The cap is the set volume; a unity (0 dB) mark sits at
+            75% travel (conventional 0 dB on a +6..-∞ taper). */}
         <div
-          aria-hidden
-          className="absolute left-1/2 top-1 bottom-1 -translate-x-1/2 rounded-full"
-          style={{
-            width: "3px",
-            background: "color-mix(in srgb, var(--color-ink) 14%, transparent)",
-            boxShadow:
-              "inset 0 0 0 1px var(--color-hairline), inset 0 1px 2px color-mix(in srgb, var(--color-ink) 25%, transparent)",
-          }}
-        />
-        {/* Unity (0 dB) mark — a hairline notch at 75% of fader travel,
-            the conventional 0 dB position on a +6..-∞ taper. */}
-        <div
-          aria-hidden
-          className="absolute left-0 right-0"
-          style={{
-            bottom: "calc(0.25rem + 0.75 * (100% - 0.5rem))",
-            height: "1px",
-            background: "var(--color-hairline-hover)",
-          }}
-        />
-        {/* Filled portion below the cap — quiet ink so the set level reads. */}
-        <div
-          aria-hidden
-          className="absolute left-1/2 -translate-x-1/2 rounded-full"
-          style={{
-            width: "3px",
-            bottom: "0.25rem",
-            height: `calc(${volume} * (100% - 0.5rem))`,
-            background: "color-mix(in srgb, var(--color-ink) 34%, transparent)",
-            transition: "height 90ms linear",
-          }}
-        />
-        {/* The cap — the draggable fader knob. */}
-        <div
-          aria-hidden
-          className="absolute left-1/2 -translate-x-1/2 rounded-[3px]"
-          style={{
-            width: "13px",
-            height: "7px",
-            bottom: `calc(${volume} * (100% - 0.5rem) + 0.25rem - 3.5px)`,
-            background: "var(--color-ink)",
-            boxShadow:
-              "0 1px 2px color-mix(in srgb, var(--color-ink) 45%, transparent), inset 0 1px 0 color-mix(in srgb, white 35%, transparent)",
-            transition: "bottom 90ms linear",
-          }}
+          className="relative h-full shrink-0"
+          style={{ width: "16px", marginTop: "8px", marginBottom: "8px" }}
         >
-          {/* grip line across the cap */}
+          {/* Routed slot — a deep recessed channel. Dark fill + strong inset
+              shadow on all sides reads as a groove milled into the plate. */}
           <div
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+            aria-hidden
+            className="absolute left-1/2 top-0 bottom-0 -translate-x-1/2 rounded-full"
             style={{
-              width: "7px",
-              height: "1px",
-              background: "var(--color-canvas)",
-              opacity: 0.5,
+              width: "6px",
+              background:
+                "linear-gradient(180deg, color-mix(in srgb, black 55%, transparent), color-mix(in srgb, black 35%, transparent))",
+              boxShadow: [
+                "inset 0 0 0 1px color-mix(in srgb, black 50%, transparent)",
+                "inset 0 2px 3px color-mix(in srgb, black 65%, transparent)",
+                "inset 0 -1px 1px color-mix(in srgb, white 5%, transparent)",
+              ].join(","),
             }}
           />
-        </div>
-        {/* Invisible vertical range over the whole fader. */}
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={volume}
-          onChange={(e) => setVolume(parseFloat(e.target.value))}
-          aria-label="Lautstärke (Fader)"
-          className="fader-input absolute inset-0 h-full w-full cursor-ns-resize"
-        />
-      </div>
-
-      {/* ── METER ──────────────────────────────────────────────────────
-          A segmented dBFS ladder with a held peak tick and printed scale.
-          Passive: it displays the live signal, it does not set anything. */}
-      <div className="relative h-full flex-1">
-        {/* Ladder housing — recessed black so dark segments read as 'off'. */}
-        <div
-          className="absolute inset-y-0 left-0 flex flex-col-reverse gap-[2px] overflow-hidden rounded-[5px] p-[3px]"
-          style={{
-            right: "16px", // leave room for the scale labels on the right
-            background: "color-mix(in srgb, var(--color-ink) 6%, transparent)",
-            boxShadow: "inset 0 0 0 1px var(--color-hairline)",
-          }}
-        >
-          {Array.from({ length: SEGMENTS }).map((_, i) => {
-            // Each segment's dBFS threshold = its position on the floor..0
-            // scale, so we can colour it by zone.
-            const segDb = FLOOR_DB + ((i + 1) / SEGMENTS) * (0 - FLOOR_DB);
-            return (
-              <div
-                key={i}
-                ref={(el) => {
-                  segRefs.current[i] = el;
-                }}
-                className="w-full flex-1 rounded-[1.5px] transition-opacity duration-75"
-                style={{
-                  background: zoneColor(segDb),
-                  opacity: IDLE_OPACITY,
-                  minHeight: "2px",
-                }}
-              />
-            );
-          })}
-
-          {/* Peak-hold tick — a bright line riding the held peak. */}
+          {/* Unity (0 dB) mark — a hairline tick beside the slot at 75%. */}
           <div
-            ref={peakRef}
             aria-hidden
-            className="pointer-events-none absolute left-[3px] right-[3px] h-[2px]"
-            style={{ bottom: "0%", background: "var(--meter-green)" }}
+            className="absolute left-0 right-0"
+            style={{
+              bottom: `calc(${SLOT_PAD}px + 0.75 * (100% - ${SLOT_PAD * 2}px))`,
+              height: "1px",
+              background: "color-mix(in srgb, white 14%, transparent)",
+            }}
+          />
+          {/* The molded cap — rides in the slot. Top highlight + side
+              shading + a grip indent line read as a thumbed fader knob; a
+              drop shadow seats it ABOVE the plate and IN the slot. On grab
+              it depresses (translateY) and the shadow tightens. */}
+          <div
+            aria-hidden
+            className="absolute left-1/2 -translate-x-1/2 rounded-[3px]"
+            style={{
+              width: "16px",
+              height: `${CAP_H}px`,
+              bottom: `calc(${volume} * (100% - ${SLOT_PAD * 2}px) + ${SLOT_PAD}px - ${CAP_H / 2}px)`,
+              background:
+                "linear-gradient(180deg, color-mix(in srgb, var(--color-ink) 92%, transparent) 0%, color-mix(in srgb, var(--color-ink) 70%, transparent) 45%, color-mix(in srgb, var(--color-ink) 82%, transparent) 100%)",
+              boxShadow: grabbed
+                ? [
+                    "inset 0 1px 0 color-mix(in srgb, white 30%, transparent)",
+                    "inset 0 -1px 0 color-mix(in srgb, black 35%, transparent)",
+                    "0 1px 1px color-mix(in srgb, black 55%, transparent)",
+                  ].join(",")
+                : [
+                    "inset 0 1px 0 color-mix(in srgb, white 45%, transparent)",
+                    "inset 0 -1px 0 color-mix(in srgb, black 30%, transparent)",
+                    "0 2px 3px color-mix(in srgb, black 55%, transparent)",
+                  ].join(","),
+              transform: grabbed ? "translateY(0.5px)" : "translateY(0)",
+              transition: "bottom 90ms linear, box-shadow 120ms, transform 120ms",
+            }}
+          >
+            {/* centre grip indent — the molded line you'd thumb */}
+            <div
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+              style={{
+                width: "9px",
+                height: "2px",
+                background: "color-mix(in srgb, black 45%, transparent)",
+                boxShadow: "0 1px 0 color-mix(in srgb, white 30%, transparent)",
+              }}
+            />
+          </div>
+          {/* Invisible vertical range over the whole fader. */}
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={volume}
+            onChange={(e) => setVolume(parseFloat(e.target.value))}
+            onPointerDown={() => setGrabbed(true)}
+            onPointerUp={() => setGrabbed(false)}
+            onPointerCancel={() => setGrabbed(false)}
+            onFocus={() => setGrabbed(true)}
+            onBlur={() => setGrabbed(false)}
+            aria-label="Lautstärke (Fader)"
+            className="fader-input absolute inset-0 h-full w-full cursor-ns-resize"
           />
         </div>
 
-        {/* Printed dBFS scale — mono ticks down the right edge. */}
-        <div
-          aria-hidden
-          className="absolute inset-y-0 right-0 flex flex-col justify-between"
-          style={{ width: "15px" }}
-        >
-          {SCALE_TICKS.map((db) => (
-            <span
-              key={db}
-              className="font-mono leading-none text-ink-faint"
-              style={{
-                fontSize: "5.5px",
-                letterSpacing: "0.02em",
-              }}
-            >
-              {db === FLOOR_DB ? "-∞" : db}
-            </span>
-          ))}
+        {/* ── METER ─────────────────────────────────────────────────────
+            A recessed WINDOW cut into the plate, holding the segmented
+            dBFS ladder, with the printed scale in its own column to the
+            right. Row layout guarantees the ladder keeps real width.
+            Passive — displays the live signal, sets nothing. */}
+        <div className="relative flex h-full flex-1 gap-[3px]">
+          {/* Meter window — inset bezel around the ladder so it reads as a
+              display let into the faceplate, not segments floating on it. */}
+          <div
+            className="relative flex h-full flex-1 flex-col-reverse gap-[2px] overflow-hidden rounded-[4px] p-[3px]"
+            style={{
+              background:
+                "linear-gradient(180deg, color-mix(in srgb, black 50%, transparent), color-mix(in srgb, black 32%, transparent))",
+              boxShadow: [
+                "inset 0 0 0 1px color-mix(in srgb, black 55%, transparent)",
+                "inset 0 2px 3px color-mix(in srgb, black 55%, transparent)",
+                "inset 0 -1px 0 color-mix(in srgb, white 5%, transparent)",
+              ].join(","),
+            }}
+          >
+            {Array.from({ length: SEGMENTS }).map((_, i) => {
+              // Each segment's dBFS threshold = its position on the floor..0
+              // scale, so we can colour it by zone.
+              const segDb = FLOOR_DB + ((i + 1) / SEGMENTS) * (0 - FLOOR_DB);
+              return (
+                <div
+                  key={i}
+                  ref={(el) => {
+                    segRefs.current[i] = el;
+                  }}
+                  className="w-full flex-1 rounded-[1.5px] transition-opacity duration-75"
+                  style={{
+                    background: zoneColor(segDb),
+                    // color drives currentColor for the lit-segment halo.
+                    color: zoneColor(segDb),
+                    opacity: IDLE_OPACITY,
+                    minHeight: "2px",
+                  }}
+                />
+              );
+            })}
+
+            {/* Peak-hold tick — a bright line riding the held peak. */}
+            <div
+              ref={peakRef}
+              aria-hidden
+              className="pointer-events-none absolute left-[3px] right-[3px] h-[2px]"
+              style={{ bottom: "0%", background: "var(--meter-green)" }}
+            />
+          </div>
+
+          {/* Printed dBFS scale — mono ticks in their own narrow column. */}
+          <div
+            aria-hidden
+            className="flex h-full shrink-0 flex-col justify-between py-[2px]"
+            style={{ width: "13px" }}
+          >
+            {SCALE_TICKS.map((db) => (
+              <span
+                key={db}
+                className="font-mono leading-none text-ink-faint"
+                style={{
+                  fontSize: "5.5px",
+                  letterSpacing: "0.02em",
+                }}
+              >
+                {db === FLOOR_DB ? "-∞" : db}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -318,18 +393,37 @@ export function ChannelStrip() {
           -webkit-appearance: none;
           appearance: none;
           width: 100%;
-          height: 7px;
+          height: ${CAP_H}px;
           background: transparent;
           cursor: ns-resize;
         }
         .fader-input::-moz-range-thumb {
           width: 100%;
-          height: 7px;
+          height: ${CAP_H}px;
           border: none;
           background: transparent;
           cursor: ns-resize;
         }
       `}</style>
     </div>
+  );
+}
+
+/** A small recessed panel screw — sells the faceplate as bolted-on. */
+function Screw({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={`pointer-events-none ${className ?? ""}`}
+      style={{
+        width: "4px",
+        height: "4px",
+        borderRadius: "9999px",
+        background:
+          "radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--color-ink) 30%, var(--color-canvas)), color-mix(in srgb, black 60%, var(--color-canvas)))",
+        boxShadow:
+          "inset 0 0.5px 0.5px color-mix(in srgb, black 60%, transparent), 0 0.5px 0 color-mix(in srgb, white 8%, transparent)",
+      }}
+    />
   );
 }

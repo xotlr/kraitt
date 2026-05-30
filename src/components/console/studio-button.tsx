@@ -9,10 +9,12 @@ import { cn } from "@/lib/utils";
  * weight active — passed by the caller); label is optional and usually
  * omitted on desktop to keep chrome minimal.
  *
- * Tactility = layered shadows on a rounded square: top highlight + bottom
- * shade read as a molded dome; active inverts to a pressed-in, amber-lit,
- * ringed cap — a latched channel button pushed in and glowing. A corner
- * LED reinforces state at a glance.
+ * Tactility = the same near-black machined-plate language as the channel
+ * strip: a beveled graphite cap (top highlight + bottom shade) raised off
+ * the bezel. Active LATCHES IN — the cap seats down into the plate (the
+ * bevel inverts to a deep inset recess) so the press reads from depth
+ * alone, with NO border-colour change and NO outer glow. State colour
+ * lives only in the tone-coloured icon + the corner LED.
  */
 /**
  * Function tones — a button's active colour encodes WHAT it does, the way
@@ -89,24 +91,30 @@ export function StudioButton({
           // Active icon = the function tone (amber nav / green play / red
           // rec). Idle inherits the muted-ink class above.
           color: active ? toneColor : undefined,
-          // Cap fill is the page CANVAS — the button blends flush into the
-          // background and is defined by its hairline ring, not a raised
-          // chip. Active latches IN: a faint tone-tinted wash + a deeper
-          // inset shadow so the cap reads as pressed and seated, plus a
-          // tone-coloured ring so the whole cap (not just the icon) lights.
-          backgroundColor: latched
-            ? `color-mix(in srgb, ${toneColor} 12%, var(--color-canvas))`
-            : "var(--color-canvas)",
+          // Machined cap — same near-black graphite faceplate language as
+          // the channel strip: a beveled plate (top highlight, bottom shade)
+          // raised off the bezel. Active LATCHES IN: the cap seats down into
+          // the plate (the bevel inverts to an inset recess) so the press
+          // reads from depth alone — NO border-colour change, NO outer glow.
+          // State colour lives only in the icon + corner LED.
+          background: latched
+            ? "linear-gradient(180deg, color-mix(in srgb, var(--color-ink) 4%, var(--color-canvas)) 0%, color-mix(in srgb, var(--color-ink) 8%, var(--color-canvas)) 100%)"
+            : "linear-gradient(180deg, color-mix(in srgb, var(--color-ink) 9%, var(--color-canvas)) 0%, var(--color-canvas) 60%, color-mix(in srgb, black 30%, var(--color-canvas)) 100%)",
           boxShadow: latched
             ? [
-                `inset 0 1px 3px color-mix(in srgb, var(--color-ink) 28%, transparent)`,
-                `inset 0 0 0 1px color-mix(in srgb, ${toneColor} 55%, transparent)`,
-                `0 0 8px color-mix(in srgb, ${toneColor} 30%, transparent)`,
+                // seated-in recess: deep inset top shade reads as the cap
+                // pushed down into the plate, faint bottom lip catches light.
+                "inset 0 3px 6px color-mix(in srgb, black 65%, transparent)",
+                "inset 0 1px 2px color-mix(in srgb, black 50%, transparent)",
+                "inset 0 -1px 0 color-mix(in srgb, white 6%, transparent)",
+                "0 0 0 1px var(--color-hairline)",
               ].join(",")
             : [
-                "inset 0 1px 0 color-mix(in srgb, white 6%, transparent)",
+                // raised machined cap: top edge highlight + bottom edge shade
+                "inset 0 1px 0 color-mix(in srgb, white 9%, transparent)",
+                "inset 0 -1px 0 color-mix(in srgb, black 35%, transparent)",
                 "0 0 0 1px var(--color-hairline)",
-                "0 1px 2px color-mix(in srgb, var(--color-ink) 12%, transparent)",
+                "0 1px 3px color-mix(in srgb, black 40%, transparent)",
               ].join(","),
         }}
       >

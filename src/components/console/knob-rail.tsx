@@ -67,7 +67,7 @@ export function KnobRail() {
                 ariaLabel={s.label}
                 ariaCurrent={isActive}
               >
-                <Icon size={20} weight={isActive ? "fill" : "regular"} />
+                <Icon size={24} weight={isActive ? "fill" : "regular"} />
               </StudioButton>
             </motion.div>
           );
@@ -76,10 +76,10 @@ export function KnobRail() {
 
       {/* Theme + language switches — pinned to the BOTTOM of the rail. */}
       <motion.div variants={item} className="flex flex-col items-center gap-5">
-        <ThemeToggle iconSize={20} />
+        <ThemeToggle iconSize={24} />
         {/* Language toggle — flag switch. Functional state (persists, sets
             <html lang>); copy translation is a later pass. */}
-        <LanguageToggle iconSize={20} />
+        <LanguageToggle iconSize={24} />
       </motion.div>
     </motion.nav>
   );

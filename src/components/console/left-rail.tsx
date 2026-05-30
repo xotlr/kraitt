@@ -59,11 +59,10 @@ export function LeftRail() {
           active={musicOn}
           tone="play"
           dot
-          label="MUS"
           onClick={musicStatus === "unavailable" ? undefined : toggleMusic}
           ariaLabel="Musik"
         >
-          <MusicNotes size={20} weight={musicOn ? "fill" : "regular"} />
+          <MusicNotes size={24} weight={musicOn ? "fill" : "regular"} />
         </StudioButton>
       </motion.div>
       <motion.div variants={item}>
@@ -71,11 +70,10 @@ export function LeftRail() {
           active={micOn}
           tone="rec"
           dot
-          label="MIC"
           onClick={toggleMic}
           ariaLabel="Mikrofon"
         >
-          <Microphone size={20} weight={micOn ? "fill" : "regular"} />
+          <Microphone size={24} weight={micOn ? "fill" : "regular"} />
         </StudioButton>
       </motion.div>
 

@@ -64,14 +64,14 @@
      edge; the rail width and meter width derive from it, so changing this
      single value rescales both side rails, every button, and the volume
      meter in lockstep. */
-  --console-unit: 42px;
+  --console-unit: 52px;
   --console-rail-pad: 14px; /* breathing room each side of a cap in the rail */
   --console-rail-w: calc(var(--console-unit) + var(--console-rail-pad) * 2);
   /* The channel strip (fader + dBFS meter + printed scale) needs more
      width than a single button cap to stay legible. It's the bottom
      element of the LEFT rail only, so the left rail is widened to this
      while the right rail keeps the narrow --console-rail-w. */
-  --console-strip-w: 62px;
+  --console-strip-w: 68px;
   --console-left-rail-w: calc(var(--console-strip-w) + var(--console-rail-pad) * 2);
 }
 
