@@ -45,8 +45,7 @@ export function KnobRail() {
     };
 
   return (
-    <motion.nav
-      aria-label="Sektionen"
+    <motion.div
       variants={rail}
       initial="hidden"
       animate="show"
@@ -57,8 +56,11 @@ export function KnobRail() {
         paddingBottom: "var(--console-rail-inset)",
       }}
     >
-      {/* Section nav — pinned to the TOP of the rail. */}
-      <div className="flex flex-col items-center gap-5">
+      {/* Section navigation — its own landmark, pinned to the TOP. The
+          settings group below is intentionally OUTSIDE this <nav> so AT
+          users find section links here and site controls as their own
+          group, not unexpectedly inside navigation. */}
+      <nav aria-label="Sektionen" className="flex flex-col items-center gap-5">
         {SECTIONS.map((s) => {
           const Icon = s.icon;
           const isActive = active === s.id;
@@ -76,15 +78,21 @@ export function KnobRail() {
             </motion.div>
           );
         })}
-      </div>
+      </nav>
 
-      {/* Theme + language switches — pinned to the BOTTOM of the rail. */}
-      <motion.div variants={item} className="flex flex-col items-center gap-5">
+      {/* Theme + language — site controls, NOT navigation. Their own
+          labelled group, pinned to the BOTTOM of the rail. */}
+      <motion.div
+        variants={item}
+        role="group"
+        aria-label="Einstellungen"
+        className="flex flex-col items-center gap-5"
+      >
         <ThemeToggle iconSize={24} />
         {/* Language toggle — flag switch. Functional state (persists, sets
             <html lang>); copy translation is a later pass. */}
         <LanguageToggle iconSize={24} />
       </motion.div>
-    </motion.nav>
+    </motion.div>
   );
 }

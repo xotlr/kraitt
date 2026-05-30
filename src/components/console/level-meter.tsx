@@ -382,8 +382,17 @@ export function ChannelStrip() {
           writing-mode: vertical-lr;
           direction: rtl;
         }
+        /* Mouse focus stays clean; keyboard focus shows a visible ring
+           around the slot so the fader's focus state is never invisible
+           (WCAG 2.4.7). The ring sits on the input, which overlays the
+           whole slot, so it reads as the fader being selected. */
         .fader-input:focus {
           outline: none;
+        }
+        .fader-input:focus-visible {
+          outline: none;
+          border-radius: 9999px;
+          box-shadow: 0 0 0 2px var(--color-string);
         }
         .fader-input::-webkit-slider-runnable-track,
         .fader-input::-moz-range-track {

@@ -42,10 +42,17 @@ export function Island({ children }: { children: React.ReactNode }) {
 
         {/*
           Live bezel edge. A non-clipping overlay sibling (so its outer
-          amber bloom can spill past the card onto the black gutter,
-          which the card's own overflow-hidden would otherwise crop).
-          --audio-glow (0..1) scales both a warm inner border tint and a
-          soft outer bloom. Pointer-events-none so it never eats clicks.
+          bloom can spill past the card onto the black gutter, which the
+          card's own overflow-hidden would otherwise crop). --audio-glow
+          (0..1) scales both an inner rim and a soft outer bloom.
+          Pointer-events-none so it never eats clicks.
+
+          The glow is NOT a baked amber accent — it's the SCREEN'S OWN
+          LIGHT spilling onto the bezel, like a real monitor frame catching
+          the glow of its display. So it uses the cool signal-white the
+          terrain contours are drawn in (--color-string, #e6dfd1-ish via
+          the cool line tone) rather than amber. It reads as a reflection
+          of what's on screen, pulsing with the signal that drives it.
         */}
         <div
           ref={edgeRef}
@@ -54,13 +61,13 @@ export function Island({ children }: { children: React.ReactNode }) {
           style={{
             // @ts-expect-error — CSS custom property, valid at runtime
             "--audio-glow": 0,
-            // Base hairline always present; warms toward amber on beat.
+            // Base hairline always present; brightens with the signal.
             border: "1px solid var(--color-hairline)",
             boxShadow:
-              // inner warm rim, scaled by glow
-              "inset 0 0 calc(var(--audio-glow) * 12px) rgba(184, 132, 92, calc(var(--audio-glow) * 0.35)), " +
-              // outer bloom onto the black bezel, scaled by glow
-              "0 0 calc(var(--audio-glow) * 26px) rgba(184, 132, 92, calc(var(--audio-glow) * 0.28))",
+              // inner rim — the screen light catching the inside frame edge
+              "inset 0 0 calc(var(--audio-glow) * 14px) rgba(221, 226, 234, calc(var(--audio-glow) * 0.28)), " +
+              // outer bloom onto the black bezel — the display's spill light
+              "0 0 calc(var(--audio-glow) * 30px) rgba(221, 226, 234, calc(var(--audio-glow) * 0.22))",
           }}
         />
       </div>

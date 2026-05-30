@@ -63,8 +63,11 @@ export function LeftRail() {
           active={musicOn}
           tone="play"
           dot
-          onClick={musicStatus === "unavailable" ? undefined : toggleMusic}
-          ariaLabel="Musik"
+          disabled={musicStatus === "unavailable"}
+          onClick={toggleMusic}
+          ariaLabel={
+            musicStatus === "unavailable" ? "Musik — nicht verfügbar" : "Musik"
+          }
         >
           <MusicNotes size={24} weight={musicOn ? "fill" : "regular"} />
         </StudioButton>

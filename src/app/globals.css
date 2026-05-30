@@ -74,7 +74,7 @@
   --console-left-rail-w: var(--console-rail-w);
   /* Vertical inset of the button GROUPS from the rail's top/bottom edges,
      so the groups sit indented rather than flush. */
-  --console-rail-inset: clamp(1.25rem, 0.75rem + 1.5vh, 2.5rem);
+  --console-rail-inset: clamp(0.6rem, 0.4rem + 0.7vh, 1.25rem);
 }
 
 /* ── Theming ──────────────────────────────────────────────────────────

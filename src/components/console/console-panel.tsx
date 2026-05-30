@@ -67,8 +67,13 @@ export function ConsolePanel() {
             tone="play"
             dot
             size={42}
-            onClick={musicStatus === "unavailable" ? undefined : toggleMusic}
-            ariaLabel="Musik"
+            disabled={musicStatus === "unavailable"}
+            onClick={toggleMusic}
+            ariaLabel={
+              musicStatus === "unavailable"
+                ? "Musik — nicht verfügbar"
+                : "Musik"
+            }
           >
             <MusicNotes size={20} weight={musicOn ? "fill" : "regular"} />
           </StudioButton>

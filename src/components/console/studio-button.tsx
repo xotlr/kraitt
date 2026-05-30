@@ -36,6 +36,7 @@ export function StudioButton({
   active = false,
   tone = "nav",
   latch = true,
+  disabled = false,
   size,
   dot = false,
   onClick,
@@ -47,6 +48,10 @@ export function StudioButton({
   active?: boolean;
   /** What the button does, encoded as its active colour (see ButtonTone). */
   tone?: ButtonTone;
+  /** Non-operational state (e.g. a source whose asset failed to load). Dims
+   *  the cap, sets aria-disabled, and blocks the click — so the user sees
+   *  the control is unavailable rather than clicking a dead button. */
+  disabled?: boolean;
   /** Whether `active` reads as a LATCHED, seated-in cap (wash + ring +
    *  glow) — true for real toggles like sources, sections, mute/rec.
    *  Set false for always-lit *indicator* buttons (theme/language) whose
@@ -72,16 +77,24 @@ export function StudioButton({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
       aria-label={ariaLabel}
       aria-current={ariaCurrent ? "true" : undefined}
       aria-pressed={active}
-      className="group flex flex-col items-center gap-1.5 outline-none"
+      aria-disabled={disabled || undefined}
+      // Focus ring on the BUTTON itself (the interactive element), not the
+      // decorative span — so keyboard focus is announced + visible. rounded
+      // matches the cap so the ring hugs the button shape.
+      className={cn(
+        "group flex flex-col items-center gap-1.5 rounded-[12px] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-string)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--color-canvas)]",
+        disabled && "cursor-not-allowed opacity-40"
+      )}
     >
       <span
         className={cn(
           "relative flex items-center justify-center rounded-[10px] transition-all duration-300",
-          "group-active:translate-y-px group-focus-visible:ring-1 group-focus-visible:ring-[color:var(--color-string)]",
+          "group-active:translate-y-px",
           // The icon takes the function tone on active; idle is muted ink.
           active ? "" : "text-ink-muted group-hover:text-ink"
         )}
