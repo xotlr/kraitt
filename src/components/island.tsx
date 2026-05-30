@@ -34,10 +34,11 @@ export function Island({ children }: { children: React.ReactNode }) {
       <div className="relative h-full w-full">
         <div className="relative h-full w-full overflow-hidden rounded-[1.25rem] bg-canvas">
           {/* children render <Scene/> (z-0) then the scroll content
-              (z-10). The readability gradient sits between them (z-1),
-              clipped to the card like everything else on the screen. */}
+              (z-10). The readability scrim used to sit between them, but it
+              read as a dark panel behind the type; removed in favour of a
+              subtle per-text shadow (see .text-legible in globals.css) so
+              the type stays readable over the terrain without a box. */}
           {children}
-          <div aria-hidden className="island-readability" />
         </div>
 
         {/*

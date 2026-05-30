@@ -146,7 +146,7 @@ export function Hero() {
               delay: 2,
             },
           }}
-          className="font-display text-display leading-[var(--text-display--line-height)] text-balance"
+          className="font-display text-display leading-[var(--text-display--line-height)] text-balance text-legible"
         >
           <span className="block" aria-label="Sufian">
             <SplitWord word="Sufian" />
@@ -171,7 +171,7 @@ export function Hero() {
 
         <motion.p
           variants={rise}
-          className="mt-12 md:mt-16 max-w-[50ch] text-body-lg leading-[var(--text-body-lg--line-height)] text-ink/80 font-body"
+          className="mt-12 md:mt-16 max-w-[50ch] text-body-lg leading-[var(--text-body-lg--line-height)] text-ink/80 font-body text-legible"
         >
           Audio für{" "}
           <span className="font-serif-italic text-ink">Film</span>,{" "}

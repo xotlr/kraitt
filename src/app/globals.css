@@ -241,36 +241,16 @@
     text-wrap: pretty;
   }
 
-  /* Readability overlay — softens the left half where the type column
-     sits, fading to transparent over the terrain on the right. Now
-     lives INSIDE the island card (see island.tsx) as an absolutely
-     positioned element between the Scene (z:0) and the content (z:10),
-     so it darkens the signal without dimming the type. Scoped to a
-     class the island applies rather than a body pseudo-element, because
-     the shader is no longer viewport-fixed — it's clipped into the
-     card, and the gradient has to share that same clip/stacking context.
-
-     0.60 on the far left lets the faint waves read through the type
-     column so the hero composes WITH the terrain. The vignette that
-     used to live here is gone: the monitor bezel now does the edge
-     framing the vignette was approximating. */
-  .island-readability {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    z-index: 1;
-    /* Fades the type column toward the canvas colour so the heading stays
-       legible over the wave field in either mode. Built from an RGB triple
-       token (--readability-rgb) set per theme — black in dark, warm paper
-       in light — using the rgb(... / alpha) space syntax, which resolves
-       reliably (unlike color-mix over an animated @property var). */
-    background: linear-gradient(
-      to right,
-      rgb(var(--readability-rgb) / 0.42) 0%,
-      rgb(var(--readability-rgb) / 0.22) 30%,
-      rgb(var(--readability-rgb) / 0.06) 55%,
-      transparent 80%
-    );
+  /* Per-text legibility shadow. Replaces the old full-card readability
+     scrim (which read as a dark panel behind the type). Instead of dimming
+     a whole region of the scene, each type block carries a soft shadow in
+     the canvas colour, so glyphs keep a faint halo of separation from the
+     terrain behind them without any visible box. The shadow colour follows
+     the theme via --readability-rgb (black in dark, paper in light). */
+  .text-legible {
+    text-shadow:
+      0 1px 12px rgb(var(--readability-rgb) / 0.55),
+      0 0 24px rgb(var(--readability-rgb) / 0.35);
   }
 
   .container-edge {

@@ -61,7 +61,7 @@ export function Ueber() {
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, margin: "-10%" }}
-            className="lg:col-span-7 lg:col-start-2 space-y-7 text-body-lg leading-[var(--text-body-lg--line-height)] text-ink/80 font-body text-pretty"
+            className="lg:col-span-7 lg:col-start-2 space-y-7 text-body-lg leading-[var(--text-body-lg--line-height)] text-ink/80 font-body text-pretty text-legible"
           >
             <motion.p variants={fadeUp}>
               Mein Weg in die Audiowelt begann mit der Frage, warum manche

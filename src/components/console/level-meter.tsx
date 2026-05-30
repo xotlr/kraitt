@@ -189,9 +189,11 @@ export function ChannelStrip() {
 
   // Cap geometry (px). The slot's travel runs between PAD at top/bottom,
   // so the cap centre moves within (100% - 2*PAD); we offset by half the
-  // cap height to centre it on the value.
+  // cap height to centre it on the value. PAD = half the cap height so at
+  // volume 0/1 the cap's bottom/top edge sits flush inside the slot ends
+  // (it never hangs past the slot, which made the min look broken).
   const CAP_H = 14;
-  const SLOT_PAD = 6;
+  const SLOT_PAD = CAP_H / 2;
 
   return (
     <div
@@ -231,17 +233,13 @@ export function ChannelStrip() {
           ].join(","),
         }}
       >
-        {/* Panel screws — top + bottom, centered on the plate. */}
-        <Screw className="absolute left-1/2 top-1 -translate-x-1/2" />
-        <Screw className="absolute left-1/2 bottom-1 -translate-x-1/2" />
-
         {/* ── FADER ─────────────────────────────────────────────────────
             A routed slot cut into the plate with a real molded cap riding
             in it. The cap is the set volume; a unity (0 dB) mark sits at
-            75% travel (conventional 0 dB on a +6..-∞ taper). */}
-        <div
-          className="relative h-full shrink-0"
-          style={{ width: "16px", marginTop: "8px", marginBottom: "8px" }}
+            75% travel (conventional 0 dB on a +6..-∞ taper). Full height,
+            no extra margins, so the fader's travel aligns with the meter's
+            top/bottom — the min/max sit flush with the meter floor/ceiling. */}
+        <div className="relative h-full shrink-0" style={{ width: "16px" }}
         >
           {/* Routed slot — a deep recessed channel. Dark fill + strong inset
               shadow on all sides reads as a groove milled into the plate. */}
@@ -466,21 +464,3 @@ export function ChannelStrip() {
   );
 }
 
-/** A small recessed panel screw — sells the faceplate as bolted-on. */
-function Screw({ className }: { className?: string }) {
-  return (
-    <span
-      aria-hidden
-      className={`pointer-events-none ${className ?? ""}`}
-      style={{
-        width: "4px",
-        height: "4px",
-        borderRadius: "9999px",
-        background:
-          "radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--color-ink) 30%, var(--color-canvas)), color-mix(in srgb, black 60%, var(--color-canvas)))",
-        boxShadow:
-          "inset 0 0.5px 0.5px color-mix(in srgb, black 60%, transparent), 0 0.5px 0 color-mix(in srgb, white 8%, transparent)",
-      }}
-    />
-  );
-}

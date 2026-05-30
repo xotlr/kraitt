@@ -102,7 +102,7 @@ export function SectionHeading({
           ref={titleRef}
           variants={titleReveal}
           style={audioGlowStyle}
-          className="font-heading text-h1 leading-[var(--text-h1--line-height)] max-w-[18ch] text-balance"
+          className="font-heading text-h1 leading-[var(--text-h1--line-height)] max-w-[18ch] text-balance text-legible"
         >
           {title}
         </motion.h2>
