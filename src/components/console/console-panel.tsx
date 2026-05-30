@@ -1,0 +1,91 @@
+"use client";
+
+import { Microphone, MusicNotes } from "@phosphor-icons/react";
+import { motion } from "framer-motion";
+import { SECTIONS } from "@/components/console/controls";
+import { LanguageToggle } from "@/components/console/language-toggle";
+import { StudioButton } from "@/components/console/studio-button";
+import { ThemeToggle } from "@/components/console/theme-toggle";
+import { useActiveSection } from "@/components/console/use-active-section";
+import { useAudio } from "@/lib/audio";
+import { useScrollTo } from "@/lib/scroll-context";
+
+/**
+ * ConsolePanel — the mobile console. Below lg the same controls fold into
+ * a horizontal strip pinned to the BOTTOM, beneath the content: section
+ * buttons on the left, audio inputs + language on the right. Icon-only
+ * tactile studio buttons, sharing StudioButton + the active-section
+ * detector with the desktop rails.
+ *
+ * Section presses fire a manual wave pulse when audio is off.
+ */
+export function ConsolePanel() {
+  const active = useActiveSection();
+  const scrollTo = useScrollTo();
+  const { musicOn, micOn, musicStatus, toggleMusic, toggleMic, triggerPulse } =
+    useAudio();
+  const audioOff = !musicOn && !micOn;
+
+  const handleSection =
+    (id: string): React.MouseEventHandler<HTMLButtonElement> =>
+    (e) => {
+      if (audioOff) triggerPulse();
+      scrollTo(id)(e);
+    };
+
+  return (
+    <motion.div
+      aria-label="Konsole"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 1.2, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 pointer-events-auto px-[var(--gutter)] pb-[max(1rem,env(safe-area-inset-bottom))] pt-4"
+    >
+      <div className="flex items-center justify-between gap-3 overflow-x-auto">
+        <div className="flex items-center gap-2.5">
+          {SECTIONS.map((s) => {
+            const Icon = s.icon;
+            const isActive = active === s.id;
+            return (
+              <StudioButton
+                key={s.id}
+                active={isActive}
+                size={42}
+                onClick={handleSection(s.id)}
+                ariaLabel={s.label}
+                ariaCurrent={isActive}
+              >
+                <Icon size={20} weight={isActive ? "fill" : "regular"} />
+              </StudioButton>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <StudioButton
+            active={musicOn}
+            tone="play"
+            dot
+            size={42}
+            onClick={musicStatus === "unavailable" ? undefined : toggleMusic}
+            ariaLabel="Musik"
+          >
+            <MusicNotes size={20} weight={musicOn ? "fill" : "regular"} />
+          </StudioButton>
+          <StudioButton
+            active={micOn}
+            tone="rec"
+            dot
+            size={42}
+            onClick={toggleMic}
+            ariaLabel="Mikrofon"
+          >
+            <Microphone size={20} weight={micOn ? "fill" : "regular"} />
+          </StudioButton>
+          <ThemeToggle iconSize={20} />
+          <LanguageToggle iconSize={20} />
+        </div>
+      </div>
+    </motion.div>
+  );
+}

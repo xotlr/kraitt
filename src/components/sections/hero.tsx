@@ -2,6 +2,19 @@
 
 import { motion, type Variants } from "framer-motion";
 import { useScrollTo } from "@/lib/scroll-context";
+import { useAudioGlow } from "@/hooks/use-audio-glow";
+
+// Amber beat-glow for the wordmark — same treatment as section
+// headings (see section-heading.tsx). Layered gold text-shadow scaled
+// by --audio-glow; zero at rest, blooms on bass hits. The hero is
+// larger, so the bloom radii are a touch wider.
+const heroGlowStyle: React.CSSProperties = {
+  // @ts-expect-error — custom property, valid CSS, not in the TS type
+  "--audio-glow": 0,
+  textShadow:
+    "0 0 calc(var(--audio-glow) * 18px) rgba(184, 132, 92, calc(var(--audio-glow) * 0.50)), " +
+    "0 0 calc(var(--audio-glow) * 44px) rgba(184, 132, 92, calc(var(--audio-glow) * 0.26))",
+};
 
 /* ------------------------------------------------------------------ */
 /*  Reveal choreography                                                */
@@ -83,6 +96,7 @@ function SplitWord({ word }: { word: string }) {
 
 export function Hero() {
   const scrollTo = useScrollTo();
+  const titleRef = useAudioGlow<HTMLHeadingElement>();
   return (
     <section
       id="hero"
@@ -117,6 +131,8 @@ export function Hero() {
              the title is inhaling.
         */}
         <motion.h1
+          ref={titleRef}
+          style={heroGlowStyle}
           variants={letterStagger}
           animate={{
             letterSpacing: ["-0.045em", "-0.040em", "-0.045em"],

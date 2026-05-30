@@ -4,6 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useAudioLevels } from "@/lib/audio";
+import { useTheme } from "@/lib/theme-context";
 
 /**
  * Atmosphere — the entire visual: OLED-black bed, film grain, and the
@@ -47,6 +48,7 @@ const fragmentShader = /* glsl */ `
   uniform float uBass;
   uniform float uMid;
   uniform float uHigh;
+  uniform float uTheme;   // 0 = dark (OLED), 1 = light (warm paper)
 
   // --- hash + simplex 3D noise (Ashima) ---
   float hash(vec2 p) {
@@ -120,21 +122,33 @@ const fragmentShader = /* glsl */ `
     vec2 p = uv;
     p.x *= uResolution.x / uResolution.y;
 
-    // OLED black bed + sparse warm pockets.
+    // Bed + sparse pockets. Dark mode: OLED black with faint warm
+    // pockets. Light mode: warm paper (#f5f2ec ≈ 0.96,0.95,0.925) with
+    // faint warm-darker pockets, so the field reads on white.
     float t = uTime * 0.04;
     float n = fbm(vec3(p * 1.4, t));
-    vec3 bg = vec3(0.0);
-    vec3 pocketColor = vec3(0.020, 0.014, 0.008);
+    vec3 bgDark = vec3(0.0);
+    vec3 bgLight = vec3(0.961, 0.949, 0.925);
+    vec3 bg = mix(bgDark, bgLight, uTheme);
+    vec3 pocketDark = vec3(0.020, 0.014, 0.008);   // lift toward warm
+    vec3 pocketLight = vec3(0.90, 0.87, 0.82);     // dip toward warm-grey
+    vec3 pocketColor = mix(pocketDark, pocketLight, uTheme);
     float pocket = smoothstep(0.94, 1.0, n * 0.5 + 0.5);
     float pocketBoost = 1.0 + uBass * 0.6;
     vec3 col = mix(bg, pocketColor * pocketBoost, pocket);
 
-    // Film grain — 2Hz re-roll, low amplitude. Subtle texture rather
-    // than visible flicker.
+    // Film grain. Amplitude raised (0.012 -> 0.028) so the texture
+    // actually reads. The catch on a pure-black bed: grain is ±half its
+    // amplitude, but the final max(col, 0.0) clamps the negative half to
+    // 0 — so on black you only ever saw the BRIGHT half, which is why it
+    // looked like almost nothing. We add a hair of floor (0.006) BEFORE
+    // adding grain so the dark grains have somewhere to go below the
+    // mean. Still reads as OLED black, just with live grain in it.
+    // 2Hz re-roll keeps it organic.
     float grainSize = 2.0;
     vec2 gridPos = uv * uResolution / grainSize + fract(uTime * 2.0);
-    float grain = (hash(gridPos) - 0.5) * 0.022;
-    col += grain;
+    float grain = (hash(gridPos) - 0.5) * 0.028;
+    col += vec3(0.006) + grain;
 
     col = max(col, vec3(0.0));
     gl_FragColor = vec4(col, 1.0);
@@ -144,6 +158,8 @@ const fragmentShader = /* glsl */ `
 export function Atmosphere() {
   const matRef = useRef<THREE.ShaderMaterial>(null);
   const levels = useAudioLevels();
+  const { theme } = useTheme();
+  const themeMix = useRef(0);
 
   const uniforms = useMemo(
     () => ({
@@ -152,6 +168,7 @@ export function Atmosphere() {
       uBass: { value: 0 },
       uMid: { value: 0 },
       uHigh: { value: 0 },
+      uTheme: { value: 0 },
     }),
     []
   );
@@ -164,6 +181,10 @@ export function Atmosphere() {
     u.uBass.value = levels.current.bass;
     u.uMid.value = levels.current.mid;
     u.uHigh.value = levels.current.high;
+    // Ease theme mix (≈450ms at 60fps) so the bed morphs with the page.
+    const target = theme === "light" ? 1 : 0;
+    themeMix.current += (target - themeMix.current) * 0.08;
+    u.uTheme.value = themeMix.current;
   });
 
   return (

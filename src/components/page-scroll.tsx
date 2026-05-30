@@ -22,8 +22,16 @@ export function PageScroll({ children }: { children: ReactNode }) {
   // Nav (the nav lives inside this scroll content). Scoping the
   // filter to the body sections only lets the Nav stay fixed to the
   // viewport.
+  // absolute-fills the island card (its rounded, clipped parent) rather
+  // than the viewport: the scroll lives ON the monitor screen, above the
+  // shader (z-0) and the readability gradient (z-1). h-full picks up the
+  // card's height (100dvh minus the bezel gutter), not 100svh, so the
+  // content scrolls within the screen instead of overflowing the bezel.
   return (
-    <ScrollArea className="h-svh" viewportRef={viewportRef}>
+    <ScrollArea
+      className="absolute inset-0 z-10 h-full"
+      viewportRef={viewportRef}
+    >
       {children}
     </ScrollArea>
   );

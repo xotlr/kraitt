@@ -46,7 +46,12 @@ export function Scene() {
   if (skip) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-0 -z-10">
+    // Absolute-fills the island card (its positioned, rounded-clipped
+    // parent) rather than the viewport, so the signal is visibly
+    // CONTAINED by the monitor bezel — the shader is the thing on the
+    // screen, the gutter is the matte around it. z-0 sits under content
+    // (z-10) but over the card's own background.
+    <div className="pointer-events-none absolute inset-0 z-0">
       <Canvas
         dpr={dpr}
         gl={{
@@ -69,7 +74,9 @@ export function Scene() {
           camera.lookAt(0, -0.2, -2.5);
         }}
         frameloop={reducedMotion ? "demand" : "always"}
-        style={{ background: "#000000" }}
+        // Token, not hardcoded black, so the canvas clear matches the
+        // theme during the load gap before the atmosphere mesh paints.
+        style={{ background: "var(--color-canvas)" }}
       >
         <Atmosphere />
         <Terrain />
@@ -82,24 +89,28 @@ export function Scene() {
               so subsequent passes operate on a clean image. */}
           <SMAA />
 
-          {/* Bloom — selective per the audit. Threshold raised so
-              only the BRIGHTEST contour peaks bloom (not the entire
-              field). intensity 1.3 -> 0.8, threshold 0.025 -> 0.18,
-              kernel HUGE -> LARGE. Result: lines stay crisp, brightest
-              crests get a soft glow halo. */}
+          {/* Bloom — selective. Threshold raised HIGH so only the bright
+              contour crests bloom; the dim surface fill (≈0.02–0.20) must
+              stay below it, otherwise bloom smears the whole field into a
+              grey haze — the exact thing that was greying out the OLED bed.
+              threshold 0.18 -> 0.32, intensity 0.8 -> 0.7. Lines bloom,
+              the bed does not. */}
           <Bloom
-            intensity={0.8}
+            intensity={0.7}
             kernelSize={KernelSize.LARGE}
-            luminanceThreshold={0.18}
-            luminanceSmoothing={0.4}
+            luminanceThreshold={0.32}
+            luminanceSmoothing={0.25}
             mipmapBlur
             blendFunction={BlendFunction.SCREEN}
           />
 
-          {/* ToneMapping (ACES filmic) AFTER bloom — gives bright
-              bloom peaks a filmic shoulder so they don't clip to
-              flat white. Standard cinematic move. */}
-          <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+          {/* ToneMapping — was ACES_FILMIC, which lifts and desaturates
+              near-black (the whole bed crept up to mid-grey). On a brand
+              whose identity is literal OLED black that's fatal. Switched to
+              a tone curve that preserves black: AgX has a true black point,
+              so #000 stays #000 while bright bloom crests still get a
+              filmic shoulder instead of clipping flat. */}
+          <ToneMapping mode={ToneMappingMode.AGX} />
 
           {/* Slight desaturation for film-stock feel. -8% saturation
               + a tiny cool hue shift. Very subtle; pushes the warm
@@ -119,11 +130,14 @@ export function Scene() {
             blendFunction={BlendFunction.NORMAL}
           />
 
-          {/* Vignette — restrained per audit. darkness 0.5 -> 0.3 so
-              corners darken without crushing to true black. */}
+          {/* Vignette — pulled to the corners only. offset 0.4 -> 0.55 so
+              the darkened ring starts much further out (the center stays
+              untouched), darkness 0.3 -> 0.28. The monitor bezel already
+              does most of the edge framing; the vignette was washing a
+              dark veil across too much of the frame. */}
           <Vignette
-            offset={0.4}
-            darkness={0.3}
+            offset={0.55}
+            darkness={0.28}
             blendFunction={BlendFunction.NORMAL}
           />
 

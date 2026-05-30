@@ -1,10 +1,11 @@
 "use client";
 
-import { useFrame, useThree } from "@react-three/fiber";
+import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useAudioLevels } from "@/lib/audio";
 import { useScrollViewport } from "@/lib/scroll-context";
+import { useTheme } from "@/lib/theme-context";
 
 /**
  * Terrain — a real 3D plane laid flat on the ground, displaced by FBM
@@ -46,7 +47,7 @@ const vertexShader = /* glsl */ `
   uniform float uBass;
   uniform float uMid;
   uniform float uHigh;
-  uniform vec2 uMouse;        // plane-local XY of cursor
+  uniform float uPulse;       // 0->1 radial pulse envelope (beat hits + manual plucks)
   varying float vWorldY;
   varying vec3 vWorldPos;
   varying float vCameraDist;
@@ -137,31 +138,77 @@ const vertexShader = /* glsl */ `
     // from previous tuning so the surface stays smooth/inviting,
     // peaks don't heave dramatically. Lower-frequency components
     // dominate so the result reads as broad ocean swell, not chop.
-    float bassEase = pow(uBass, 1.5);
-    float midEase = pow(uMid, 1.5);
-    float highEase = pow(uHigh, 1.4);
+    // Gentle gamma. The old 1.5 curve crushed mid-level beats (a 0.5
+    // hit became 0.35 before the field floor halved it again), so the
+    // surface barely rose. 1.1 keeps a little toe to suppress noise but
+    // lets real beats through close to 1:1.
+    float bassEase = pow(uBass, 1.1);
+    float midEase = pow(uMid, 1.1);
+    float highEase = pow(uHigh, 1.1);
 
-    // All wave time multipliers halved — the previous speed felt
-    // hectic. Slow ocean now: big swells over ~15 seconds, chop
-    // ~6-8 seconds, ripples ~3-4 seconds.
+    // ---- SPATIAL AUDIO ENERGY ----
+    // The old version multiplied every wave by a single global band
+    // value, so the whole plane heaved in unison — a uniform pump, not
+    // a sea. Here each band's energy TRAVELS across the surface as a
+    // moving field, so a hit reads as a wavefront sweeping through the
+    // water rather than the entire surface lifting at once.
+    //
+    // Each "audioField" is a slow large-scale ripple in *amplitude*
+    // (not height) that drifts in its own direction. Where the field is
+    // high, that band's waves are tall; where it's low, they're flat.
+    // The field itself moves, so the tall region moves — energy with a
+    // location and a velocity. Different directions per band keep them
+    // from peaking together.
+    float bassField = 0.5 + 0.5 * sin(dot(vec2(0.9, 0.35), position.xy) * 0.22 - uTime * 0.30);
+    float midField  = 0.5 + 0.5 * sin(dot(vec2(-0.4, 0.95), position.xy) * 0.40 + uTime * 0.55);
+    float highField = 0.5 + 0.5 * sin(dot(vec2(0.6, -0.8), position.xy) * 0.70 + uTime * 0.95 + 1.3);
+
+    // Band energy = global level shaped by its traveling field. The
+    // field MODULATES the energy spatially but no longer starves it: the
+    // floor is high (0.7) so a beat lifts the whole surface, while the
+    // field still adds ~40% extra height where it peaks — that's the
+    // travelling wavefront. Previously the floor was 0.45/0.35, which
+    // combined with the gamma meant beats barely registered.
+    float audioBass = bassEase * (0.7 + 0.4 * bassField);
+    float audioMid  = midEase  * (0.7 + 0.4 * midField);
+    float audioHigh = highEase * (0.7 + 0.4 * highField);
+
+    // Wave time multipliers reduced a further ~40% (was already halved
+    // once). Even slower ocean now: big swells over ~25 seconds, chop
+    // ~10-13 seconds, ripples ~5-7 seconds.
     float bigSwell =
-      sin(dot(vec2(1.0, 0.2), position.xy) * 0.28 + uTime * 0.4) *
-      (0.14 + bassEase * 1.3);
+      sin(dot(vec2(1.0, 0.2), position.xy) * 0.28 + uTime * 0.24) *
+      (0.14 + audioBass * 1.3);
     float crossSwell =
-      sin(dot(vec2(0.3, 1.0), position.xy) * 0.34 + uTime * 0.28 + 1.7) *
-      (0.10 + bassEase * 0.85);
+      sin(dot(vec2(0.3, 1.0), position.xy) * 0.34 + uTime * 0.17 + 1.7) *
+      (0.10 + audioBass * 0.85);
     float chop1 =
-      sin(dot(vec2(0.7, -0.7), position.xy) * 0.9 + uTime * 0.7 + 0.5) *
-      (0.05 + midEase * 0.9);
+      sin(dot(vec2(0.7, -0.7), position.xy) * 0.9 + uTime * 0.42 + 0.5) *
+      (0.05 + audioMid * 0.9);
     float chop2 =
-      sin(dot(vec2(-0.5, 0.85), position.xy) * 1.05 + uTime * 0.85 + 3.0) *
-      (0.04 + midEase * 0.7);
+      sin(dot(vec2(-0.5, 0.85), position.xy) * 1.05 + uTime * 0.51 + 3.0) *
+      (0.04 + audioMid * 0.7);
     float ripple1 =
-      sin(dot(vec2(0.9, 0.4), position.xy) * 2.2 + uTime * 1.45) *
-      (0.025 + highEase * 0.35);
+      sin(dot(vec2(0.9, 0.4), position.xy) * 2.2 + uTime * 0.87) *
+      (0.025 + audioHigh * 0.35);
     float ripple2 =
-      sin(dot(vec2(-0.6, 0.8), position.xy) * 2.8 + uTime * 1.65 + 2.2) *
-      (0.02 + highEase * 0.25);
+      sin(dot(vec2(-0.6, 0.8), position.xy) * 2.8 + uTime * 0.99 + 2.2) *
+      (0.02 + audioHigh * 0.25);
+
+    // ---- RADIAL BEAT PULSE ----
+    // On a bass hit, a ring expands outward from the origin (the sound
+    // "source"). uPulse is a 0->1 envelope retriggered on each beat in
+    // JS; here it drives a sine ring whose radius grows as the envelope
+    // decays, so the crest sweeps outward and fades. This is the most
+    // literal "spatial wave" — a disturbance with an epicenter that
+    // propagates. Damped by distance so it dies out toward the horizon.
+    float radius = length(position.xy);
+    float ringPhase = radius * 1.1 - uPulse * 9.0;       // crest travels out as pulse rises
+    float ringEnv = uPulse * (1.0 - uPulse);             // 0 at rest & full, peaks mid-pulse
+    float radialPulse =
+      sin(ringPhase) *
+      exp(-radius * 0.18) *                              // distance damping
+      ringEnv * 1.6;
 
     // Sum the wave layers.
     float waveSum =
@@ -170,21 +217,13 @@ const vertexShader = /* glsl */ `
       chop1 * 0.18 +
       chop2 * 0.14 +
       ripple1 +
-      ripple2;
+      ripple2 +
+      radialPulse;
 
     // Water texture — soft broad FBM noise on top of the sines.
-    float texture = fbm(position.xy * 0.35, uTime * 0.22) * 0.06;
+    float texture = fbm(position.xy * 0.35, uTime * 0.13) * 0.06;
 
-    // Mouse-driven ripple: a smooth bump centered at the cursor's
-    // plane-local position. Gaussian falloff so the disturbance is
-    // soft at the edges. The vertex rises slightly under the cursor
-    // and tapers to zero past ~2 wu radius. Amplitude tied to a
-    // small fixed value — strong enough to feel responsive but not
-    // dominating the wave field.
-    float mouseDist = distance(position.xy, uMouse);
-    float mouseBump = exp(-mouseDist * mouseDist * 0.6) * 0.35;
-
-    float displaced = waveSum + texture + mouseBump;
+    float displaced = waveSum + texture;
 
     vec3 newPos = vec3(position.x, position.y, displaced);
 
@@ -213,6 +252,7 @@ const fragmentShader = /* glsl */ `
   uniform float uBass;
   uniform float uHigh;
   uniform vec3 uColor;
+  uniform float uTheme;   // 0 = dark, 1 = light (eased in JS)
 
   void main() {
     // Contour spacing. Bass tightens spacing dramatically — lines
@@ -226,11 +266,11 @@ const fragmentShader = /* glsl */ `
     float ratio = vWorldY / spacing;
     float distNorm = abs(fract(ratio) - 0.5);
 
-    // Atmospheric depth fade. Visible band is 3.0..9.0 wu — tighter
-    // than before so the FAR distance fully dissolves into OLED
-    // black, and the near foreground reads as brighter. Deepens the
-    // overall sense of atmospheric perspective.
-    float depthFade = smoothstep(9.0, 3.0, vCameraDist);
+    // Atmospheric depth fade. Visible band widened to 2.5..12.0 wu so
+    // more of the plane reads as live signal (the old 3..9 band dissolved
+    // most of the terrain into black, leaving only a few corner contours).
+    // The far edge still fades fully to OLED black for atmospheric depth.
+    float depthFade = smoothstep(12.0, 2.5, vCameraDist);
 
     // Pixel-stable line width via screen-space derivatives. Near lines
     // crisp, far lines softer.
@@ -262,27 +302,47 @@ const fragmentShader = /* glsl */ `
     // look. Peaks slightly brighter than valleys, far slopes fade to
     // black via depthFade. This is what makes the 3D form readable
     // instead of just floating contour outlines on void.
-    float surfaceShade = vHeightNorm * 0.18 + 0.02;  // 0.02 in valleys, 0.20 at peaks
+    float surfaceShade = vHeightNorm * 0.26 + 0.03;  // 0.03 in valleys, 0.29 at peaks
     surfaceShade *= depthFade;
     surfaceShade *= rightMask;
-    // Genuinely cool surface tone (B > G > R).
-    vec3 surfaceColor = vec3(0.14, 0.17, 0.23) * surfaceShade;
+    // Surface fill between the lines. Dark mode: a faint cool tint that
+    // makes the 3D form readable on black. Light mode: we DROP this almost
+    // entirely so clean paper shows between the lines — a grey fill there
+    // just washes the contrast out and buries the lines. Fade it to ~0 as
+    // uTheme→1.
+    vec3 surfaceTint = vec3(0.14, 0.17, 0.23);   // the fill COLOUR (not premult)
+    float surfaceAlpha = surfaceShade * (1.0 - uTheme * 0.92);
 
     // ---- LINE COLOR ----
-    // Genuinely cold white-blue by default. The previous "cool cream"
-    // #e6dfd1 was actually slightly warm-cream (R>G>B) which on OLED
-    // black reads gold-adjacent. #dde2ea has B>G>R — actually cool.
-    // Gold tint only kicks in past 0.5 bass and is mostly gold by 0.8
-    // — only the loudest beats trigger the warm color.
+    // Dark mode: cold white-blue, warming to gold only on loud beats.
+    // Light mode: a warm near-black ink so the contours read as drawn
+    // lines on paper; gold beat-tint still applies.
     vec3 cool = vec3(0.867, 0.886, 0.918);   // #dde2ea genuinely cold
     vec3 gold = vec3(0.722, 0.518, 0.361);   // #b8845c
+    vec3 inkLine = vec3(0.08, 0.06, 0.04);   // near-black warm ink for light
     float goldMix = smoothstep(0.5, 0.8, uBass);
-    vec3 lineColor = mix(cool, gold, goldMix);
+    vec3 darkLine = mix(cool, gold, goldMix);
+    vec3 lightLine = mix(inkLine, gold, goldMix * 0.7);
+    vec3 lineColor = mix(darkLine, lightLine, uTheme);
 
-    // Composite: surface fill + lines on top. Don't discard — the
-    // surface fill makes the mesh visible even between lines.
-    vec3 finalColor = surfaceColor + lineColor * line;
-    float finalAlpha = max(surfaceShade, line);
+    // Line alpha. Dark mode lifted to 1.35× so the contours are clearly
+    // the brightest thing on the OLED-black bed (the instrument reads as a
+    // live signal, not faint corner lines). Light mode stays ~2.8× so the
+    // field reads as drawn ink on paper rather than washing out.
+    float lineAlpha = line * mix(1.35, 2.8, uTheme);
+
+    // Composite as proper (non-premultiplied) source colour + coverage.
+    // The fragment alpha-blends over the atmosphere's background, so the
+    // RGB we output must be the un-weighted colour (the blender applies
+    // src.a). Lines sit over the surface fill: pick the line colour where
+    // it covers, else the surface tint. This matters on the light paper
+    // bed where the destination is bright (the old additive form only
+    // looked right because dark-mode dst was black).
+    float finalAlpha = max(surfaceAlpha, lineAlpha);
+    float lineFrac = finalAlpha > 0.0001 ? lineAlpha / finalAlpha : 0.0;
+    // Both surfaceTint and lineColor are plain (un-premultiplied) colours;
+    // pick line where it covers, surface tint elsewhere.
+    vec3 finalColor = mix(surfaceTint, lineColor, lineFrac);
 
     if (finalAlpha < 0.005) discard;
     gl_FragColor = vec4(finalColor, finalAlpha);
@@ -294,6 +354,11 @@ export function Terrain() {
   const matRef = useRef<THREE.ShaderMaterial>(null);
   const levels = useAudioLevels();
   const viewportRef = useScrollViewport();
+  const { theme } = useTheme();
+  // Eased 0..1 theme mix the shader reads; lerps toward the target so the
+  // background morphs in sync with the CSS @property token transition
+  // rather than snapping (the moneypower pattern).
+  const themeMix = useRef(0);
 
   const { geometry, uniforms } = useMemo(() => {
     const geo = new THREE.PlaneGeometry(
@@ -308,11 +373,9 @@ export function Terrain() {
       uBass: { value: 0 },
       uMid: { value: 0 },
       uHigh: { value: 0 },
+      uPulse: { value: 0 },
+      uTheme: { value: 0 },
       uColor: { value: new THREE.Color("#b8845c") },
-      // Mouse position in plane-local XY. (-99, -99) = off-surface
-      // (no ripple) at startup so the cursor effect only kicks in
-      // once the user actually moves the mouse over the canvas.
-      uMouse: { value: new THREE.Vector2(-99, -99) },
     };
     return { geometry: geo, uniforms: u };
   }, []);
@@ -326,33 +389,33 @@ export function Terrain() {
   const scrollTarget = useRef(0);
   const scrollSmoothed = useRef(0);
 
-  // Mouse in NDC, raycast into plane-local space each frame. Target
-  // and smoothed are kept separately so the ripple eases in/out of
-  // motion instead of snapping with the cursor.
-  const mouseNDC = useRef(new THREE.Vector2(-99, -99));
-  const mouseLocalTarget = useRef(new THREE.Vector2(-99, -99));
-  const mouseLocalSmoothed = useRef(new THREE.Vector2(-99, -99));
-  const camera = useThree((s) => s.camera);
-  const raycaster = useMemo(() => new THREE.Raycaster(), []);
-  const intersectScratch = useMemo(() => new THREE.Vector3(), []);
+  // Radial beat pulse state. We detect a bass ONSET (this frame's bass
+  // jumped well above last frame's) and, when not already mid-pulse,
+  // launch a 0->1 ramp. The ramp drives uPulse, which the shader turns
+  // into an expanding ring. prevBass tracks the previous frame's level
+  // for onset detection; pulse is the live envelope value.
+  const prevBass = useRef(0);
+  const pulse = useRef(0);
+  const pulseActive = useRef(false);
 
-  useEffect(() => {
-    const onMove = (e: PointerEvent) => {
-      mouseNDC.current.x = (e.clientX / window.innerWidth) * 2 - 1;
-      mouseNDC.current.y = -(e.clientY / window.innerHeight) * 2 + 1;
-    };
-    const onLeave = () => {
-      // Off-canvas → push the target way off-surface so the ripple
-      // dies smoothly via the lerp below.
-      mouseLocalTarget.current.set(-99, -99);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerleave", onLeave);
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerleave", onLeave);
-    };
-  }, []);
+  // Eased band amplitudes for the WAVE FIELD and contours. The shared
+  // audio levels have a deliberately snappy attack (good for the beat
+  // glow and the radial-pulse onset, which want the raw transient), but
+  // feeding them straight into wave height made the surface surge and
+  // collapse in a single frame. These refs are a slower one-pole over
+  // those levels — separate attack vs. release so energy swells in over
+  // a few frames and ebbs out gently, like real water gaining/losing a
+  // swell rather than snapping to it. Used ONLY for the uniforms; the
+  // onset detector below still reads the raw level.
+  const ampBass = useRef(0);
+  const ampMid = useRef(0);
+  const ampHigh = useRef(0);
+
+  // Last pulse counter we acted on. The console buttons increment
+  // levels.current.pulse via triggerPulse(); when this lags that, fire a
+  // manual ripple (see useFrame). Lets a click "pluck" the surface when
+  // no audio is driving it.
+  const seenPulse = useRef(0);
 
   // Read scroll position from the ScrollArea viewport, not window.
   // Same source the rest of the scroll-driven code uses.
@@ -382,38 +445,59 @@ export function Terrain() {
       (scrollTarget.current - scrollSmoothed.current) * 0.1;
 
     const mat = matRef.current;
-    const mesh = meshRef.current;
     if (!mat) return;
     const u = mat.uniforms;
     u.uTime.value = clock.elapsedTime;
     u.uScroll.value = scrollSmoothed.current;
-    u.uBass.value = levels.current.bass;
-    u.uMid.value = levels.current.mid;
-    u.uHigh.value = levels.current.high;
 
-    // ---- MOUSE RIPPLE ----
-    // Raycast from camera through cursor NDC onto the plane. The hit
-    // point's plane-LOCAL XY (NOT world XY) is what the vertex shader
-    // expects since vertex positions are pre-rotation. We convert by
-    // applying the inverse of the mesh's world matrix.
-    if (mesh && mouseNDC.current.x > -2) {
-      raycaster.setFromCamera(mouseNDC.current, camera);
-      const hit = raycaster.intersectObject(mesh, false)[0];
-      if (hit) {
-        // hit.point is world space. Convert to plane-local by
-        // inverse-transforming through the mesh's matrix.
-        intersectScratch.copy(hit.point);
-        mesh.worldToLocal(intersectScratch);
-        mouseLocalTarget.current.set(intersectScratch.x, intersectScratch.y);
+    // Ease theme mix toward target (0 dark / 1 light). 0.08/frame ≈ a
+    // ~450ms settle at 60fps, matching the CSS token transition.
+    const themeTarget = theme === "light" ? 1 : 0;
+    themeMix.current += (themeTarget - themeMix.current) * 0.08;
+    u.uTheme.value = themeMix.current;
+
+    // Ease the band amplitudes toward the live levels. Asymmetric and
+    // attack-heavy: the wave reacts fast on the way UP (so it tracks the
+    // beat without feeling laggy) but releases slowly on the way DOWN,
+    // so it swells with the hit and then ebbs out smoothly instead of
+    // snapping to zero. Earlier values smoothed the attack too — that
+    // read as lag. The fade was never the problem; only the surge was.
+    const AMP_ATTACK = 0.4;
+    const AMP_RELEASE = 0.05;
+    const ease = (cur: number, target: number) =>
+      cur + (target - cur) * (target > cur ? AMP_ATTACK : AMP_RELEASE);
+    ampBass.current = ease(ampBass.current, levels.current.bass);
+    ampMid.current = ease(ampMid.current, levels.current.mid);
+    ampHigh.current = ease(ampHigh.current, levels.current.high);
+    u.uBass.value = ampBass.current;
+    u.uMid.value = ampMid.current;
+    u.uHigh.value = ampHigh.current;
+
+    // ---- RADIAL PULSE TRIGGER ----
+    // Two ways to launch the expanding ring:
+    //   1. A bass ONSET — bass surged this frame and is loud enough.
+    //   2. A MANUAL pluck — a console button bumped levels.pulse while no
+    //      audio is playing, so a click ripples the surface itself.
+    // Either fires only when no ring is already in flight, so one
+    // beat/click = one clean ring rather than a per-frame retrigger.
+    const bassNow = levels.current.bass;
+    const onset = bassNow - prevBass.current > 0.18 && bassNow > 0.35;
+    const plucked = levels.current.pulse !== seenPulse.current;
+    seenPulse.current = levels.current.pulse;
+    if ((onset || plucked) && !pulseActive.current) {
+      pulseActive.current = true;
+      pulse.current = 0;
+    }
+    prevBass.current = bassNow;
+    if (pulseActive.current) {
+      // Advance the ring. ~1.4s to fully expand and fade, then disarm.
+      pulse.current += 0.012;
+      if (pulse.current >= 1) {
+        pulse.current = 0;
+        pulseActive.current = false;
       }
     }
-    // Smooth toward target so the ripple eases in/out instead of
-    // snapping. Faster lerp = snappier cursor feel.
-    mouseLocalSmoothed.current.x +=
-      (mouseLocalTarget.current.x - mouseLocalSmoothed.current.x) * 0.12;
-    mouseLocalSmoothed.current.y +=
-      (mouseLocalTarget.current.y - mouseLocalSmoothed.current.y) * 0.12;
-    (u.uMouse.value as THREE.Vector2).copy(mouseLocalSmoothed.current);
+    u.uPulse.value = pulse.current;
   });
 
   return (

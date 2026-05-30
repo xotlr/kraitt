@@ -1,9 +1,18 @@
 # Sufian Kraitt — Audio / Film Portfolio
 
 A personal site for an audio engineer working across film, TV, and music.
-Dark, cinematic, type-led. The visual identity is **a live shader that
-behaves like a vibrating instrument** — warm noise blobs and thin strings
-that pluck in response to the cursor. The shader is the brand.
+Dark, cinematic, type-led. The site is framed as a **studio monitor**: a
+rounded "island" card is the screen, the black gutter around it is the
+bezel/matte, and console rails (section nav, audio inputs, theme/language)
+frame the screen like a mixing desk. Inside the screen is **a live r3f
+scene that behaves like a vibrating instrument** — a 3D vertex-displaced
+terrain whose waves react to the cursor and to audio, under a cinematic
+post-processing stack. The scene is the brand.
+
+> Note: earlier iterations described "noise blobs and thin strings." That
+> shader (`grainient.tsx`) has been replaced by the 3D terrain scene under
+> `src/components/scene/`. Strings/pluck were the design intent and now
+> read as cursor/audio-driven wave ripples, not literal string geometry.
 
 ## Stack
 
@@ -61,36 +70,59 @@ illustrations), the UI element is wrong.
 
 Concrete consequences:
 - Fraunces at weight 200–300 — anything heavier muddies the warm blobs.
-- No images, no icons in section content (per Sufian's brief, reinforced
-  by the shader doing the visual lifting).
+- No images, and no icons *in section content* (per Sufian's brief,
+  reinforced by the shader doing the visual lifting). The console chrome
+  is the deliberate exception: the rails use Phosphor icons
+  (`@phosphor-icons/react`) for the tactile studio buttons, because the
+  desk metaphor needs glyphs. Icons stay out of the editorial body.
 - Hairline dividers, not solid blocks.
 - One accent color (amber) — it appears in *italic accents* and in the
   shader peaks. Nowhere else.
 
 ### 3. Honest performance gates
 
-The shader is the most expensive thing on the page. The rules:
+The scene is the most expensive thing on the page. The rules, with
+current implementation status (`src/components/scene/index.tsx`,
+`src/hooks/use-device-capability.ts`):
 
-- Frame-cap to 30fps desktop / 20fps mobile. 60fps for a slow drifting
-  noise field is wasted heat.
-- Pause when the tab is hidden.
-- Skip entirely on low-end devices (`navigator.deviceMemory <= 1` or
-  `hardwareConcurrency <= 1`).
-- Render one static frame for `prefers-reduced-motion`, then stop.
-- DPR capped at 1 on viewports `< 1024px`. The shader is soft; the
-  extra pixels are invisible but the fill cost is real on integrated
-  GPUs.
+- **[NOT YET ENFORCED] Frame-cap to 30fps desktop / 20fps mobile.** The
+  scene currently runs `frameloop="always"` (full rAF, ~60fps). The cap
+  is intended but not implemented — the terrain has more visible motion
+  than the old drifting noise field, so the "60fps is wasted heat"
+  argument is weaker here, but the gate still belongs. Do not treat this
+  as done.
+- **[NOT YET ENFORCED] Pause when the tab is hidden.** No
+  `visibilitychange`/`document.hidden` handling exists yet. r3f keeps
+  rendering in a backgrounded tab. This should be added.
+- **[DONE] Skip entirely on low-end devices** (`deviceMemory <= 1` or
+  `hardwareConcurrency <= 1` → tier `low` → `Scene` returns null).
+- **[PARTIAL] `prefers-reduced-motion`** sets `frameloop="demand"` so the
+  scene holds a static frame instead of animating. (Not a hard one-frame
+  stop, but functionally a still image.)
+- **[DONE] DPR capped at 1 on viewports `< 1024px`** (`[1, 1.5]` above,
+  `1` below). The scene is soft; the extra pixels are invisible but the
+  fill cost is real on integrated GPUs.
 
-These rules survive any rewrite. If a future change drops one, justify
-it explicitly.
+These rules survive any rewrite. The two NOT-YET-ENFORCED gates are debt,
+not deletions — they should be implemented, not silently dropped. If a
+future change removes any gate, justify it explicitly.
 
 ### 4. Where logic lives
 
-- `src/components/grainient.tsx` (or its r3f-flavored successor)
-  is the shader and only the shader. No business logic, no content.
-- `src/components/sections/*.tsx` are content + layout. They render
-  the shader as a background once, at the root layout — sections never
-  re-instantiate it.
+- `src/components/scene/*.tsx` is the r3f scene and only the scene
+  (`index.tsx` composes it; `atmosphere.tsx`, `terrain.tsx`,
+  `camera-rig.tsx` are its parts). No business logic, no content.
+  `grainient.tsx` no longer exists.
+- `src/components/island.tsx` is the monitor-bezel frame that contains
+  the scene; `src/components/console/*` is the desk chrome (rails,
+  studio buttons, level meter, theme/language/audio toggles).
+- `src/components/sections/*.tsx` are content + layout. The scene is
+  mounted once (inside the island, not re-instantiated per section).
+  Sections are German-named: `hero`, `ueber`, `leistungen`,
+  `referenzen`, `kontakt`.
+- `src/lib/*` holds the cross-cutting contexts and the audio engine:
+  `audio.tsx`, `theme-context.tsx`, `language-context.tsx`,
+  `scroll-context.tsx`, `utils.ts`.
 - `src/data/*.ts` is typed content. The site has no database.
 
 ### 5. Honesty in the work
@@ -107,19 +139,25 @@ it explicitly.
 ```
 src/
   app/                  Next App Router
-    layout.tsx          Root layout + shader mount + fonts
+    layout.tsx          Root layout: providers, island + console mount, fonts
     page.tsx            Composes all sections
     globals.css         Tailwind 4 @theme + tokens
   components/
-    grainient.tsx       The shader (will become r3f-based)
-    nav.tsx             Fixed top nav with section observers
+    island.tsx          Monitor-bezel frame; contains the scene
+    page-scroll.tsx     Scroll container / progress wiring
     section-heading.tsx Shared heading block
-    sections/           One file per landing section
-    ui/                 Radix-based primitives (Dialog)
+    scene/              r3f scene (index, atmosphere, terrain, camera-rig)
+    console/            Desk chrome: rails, studio buttons, meter, toggles
+    sections/           One file per landing section (German-named)
+    ui/                 Radix-based primitives (dialog, scroll-area)
   data/projects.ts      Project data (typed)
-  hooks/                React hooks (device capability, etc.)
-  lib/utils.ts          cn() helper
+  hooks/                React hooks (device-capability, audio-glow)
+  lib/                  audio engine + theme/language/scroll contexts, utils
 ```
+
+> Nav is no longer a standalone `nav.tsx` — section navigation lives in
+> the console rails (`components/console/`) and is mounted from
+> `layout.tsx`.
 
 ## Running
 

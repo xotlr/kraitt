@@ -38,6 +38,11 @@ type AudioState = {
   setVolume: (v: number) => void;
   toggleMusic: () => Promise<void>;
   toggleMic: () => Promise<void>;
+  /** Fire a one-shot manual "pluck" — the console buttons call this so a
+   *  click ripples the wave field when no audio source is playing. The
+   *  shader watches LevelsRef.pulse (a counter) and launches a radial
+   *  ring each time it increments. */
+  triggerPulse: () => void;
 };
 
 const VOLUME_STORAGE_KEY = "sk:volume";
@@ -47,7 +52,15 @@ const AudioContext = createContext<AudioState | null>(null);
 
 // Levels are exposed via a ref-like getter so the shader can read them
 // every frame without re-rendering React on every audio frame.
-type LevelsRef = { bass: number; mid: number; high: number };
+type LevelsRef = {
+  bass: number;
+  mid: number;
+  high: number;
+  /** Monotonic counter — incremented by triggerPulse(). The shader
+   *  remembers the last value it saw and fires a manual ripple whenever
+   *  it changes. */
+  pulse: number;
+};
 const LevelsContext = createContext<{ current: LevelsRef } | null>(null);
 
 const FFT_SIZE = 1024; // 512 usable bins; cheap, plenty for 3 bands
@@ -114,7 +127,13 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
   // Levels object shared by reference with the shader hook. We mutate
   // .bass/.mid/.high in place each frame; React does not re-render.
-  const levelsRef = useRef<LevelsRef>({ bass: 0, mid: 0, high: 0 });
+  const levelsRef = useRef<LevelsRef>({ bass: 0, mid: 0, high: 0, pulse: 0 });
+
+  // Manual pluck — bumps the pulse counter the shader watches. useCallback
+  // so its identity is stable in the context value.
+  const triggerPulse = useCallback(() => {
+    levelsRef.current.pulse += 1;
+  }, []);
 
   // Lazily build the shared graph on first toggle. Browsers require a
   // user gesture before resume(), so we don't construct anything until
@@ -331,8 +350,18 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       setVolume,
       toggleMusic,
       toggleMic,
+      triggerPulse,
     }),
-    [musicOn, micOn, musicStatus, volume, setVolume, toggleMusic, toggleMic]
+    [
+      musicOn,
+      micOn,
+      musicStatus,
+      volume,
+      setVolume,
+      toggleMusic,
+      toggleMic,
+      triggerPulse,
+    ]
   );
   const levelsValue = useMemo(() => ({ current: levelsRef.current }), []);
 

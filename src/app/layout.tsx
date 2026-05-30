@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
+import { Island } from "@/components/island";
+import { ConsolePanel } from "@/components/console/console-panel";
+import { KnobRail } from "@/components/console/knob-rail";
+import { LeftRail } from "@/components/console/left-rail";
 import { PageScroll } from "@/components/page-scroll";
 import { Scene } from "@/components/scene";
-import { VolumeSlider } from "@/components/volume-slider";
 import { AudioProvider } from "@/lib/audio";
+import { LanguageProvider } from "@/lib/language-context";
 import { ScrollProvider } from "@/lib/scroll-context";
+import { ThemeProvider } from "@/lib/theme-context";
 import "./globals.css";
 
 const geist = Geist({
@@ -40,12 +45,23 @@ export default function RootLayout({
   return (
     <html
       lang="de"
+      suppressHydrationWarning
       className={`${geist.variable} ${fraunces.variable} ${geistMono.variable}`}
     >
+      <head>
+        {/* Set the theme class before first paint so there's no dark→light
+            flash on a reload when the user previously chose light. Mirrors
+            the no-flash script the other Pluto sites use. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('sk-theme');if(t==='light')document.documentElement.classList.add('light')}catch(e){}`,
+          }}
+        />
+      </head>
       {/* overflow-hidden because actual page scroll happens inside the
           PageScroll ScrollArea below. Without this, native scrollbars
           can still appear if children overflow the body. */}
-      <body className="text-ink antialiased atmos overflow-hidden h-svh">
+      <body className="text-ink antialiased overflow-hidden h-svh bg-canvas">
         {/* SVG filter for DOM chromatic aberration. Splits RGB into
             three channels, offsets each by 1-2px in opposing
             directions, composites with screen blending. Same effect
@@ -100,40 +116,33 @@ export default function RootLayout({
           </defs>
         </svg>
 
-        {/* Edge-blur overlay. A fixed full-viewport div with
-            backdrop-filter:blur masked by a radial gradient so only
-            the periphery is blurred. backdrop-filter reads from the
-            compositor — works on canvas AND DOM, giving the whole
-            app a unified lens-defocus edge effect. */}
-        <div
-          aria-hidden
-          style={{
-            position: "fixed",
-            inset: 0,
-            pointerEvents: "none",
-            // Above main content (z:10) so it can blur the text too,
-            // below the nav (z:40) and volume slider so controls
-            // stay sharp + clickable.
-            zIndex: 30,
-            backdropFilter: "blur(7px)",
-            WebkitBackdropFilter: "blur(7px)",
-            // Mask: transparent at center, opaque at edges → blur
-            // only renders where the mask is opaque. Gradient stops
-            // chosen so the inner ~50% of the frame stays sharp and
-            // the outer ~25% is fully blurred, with a smooth fade.
-            maskImage:
-              "radial-gradient(ellipse 85% 80% at center, transparent 35%, rgba(0,0,0,0.4) 65%, black 100%)",
-            WebkitMaskImage:
-              "radial-gradient(ellipse 85% 80% at center, transparent 35%, rgba(0,0,0,0.4) 65%, black 100%)",
-          }}
-        />
-        <AudioProvider>
+        <ThemeProvider>
+          <AudioProvider>
+          <LanguageProvider>
           <ScrollProvider>
-            <Scene />
-            <VolumeSlider />
-            <PageScroll>{children}</PageScroll>
+            {/* The console. A 3-column row: audio INPUT rail · the
+                screen (island) · the section-knob rail. The rails are
+                real columns (~5% each) that FRAME the screen — they
+                replace the left/right bezel rather than floating over
+                it. The island fills the ~90% center track. A thin
+                top/bottom gutter on the island keeps the screen inset.
+
+                Below lg the rails collapse (bezel too thin for hardware)
+                and ConsolePanel takes over as a horizontal control deck
+                pinned below the content. */}
+            <div className="flex h-svh w-full items-stretch">
+              <LeftRail />
+              <Island>
+                <Scene />
+                <PageScroll>{children}</PageScroll>
+              </Island>
+              <KnobRail />
+            </div>
+            <ConsolePanel />
           </ScrollProvider>
-        </AudioProvider>
+          </LanguageProvider>
+          </AudioProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
