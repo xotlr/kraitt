@@ -50,8 +50,12 @@ export function KnobRail() {
       variants={rail}
       initial="hidden"
       animate="show"
-      className="hidden lg:flex shrink-0 flex-col items-center justify-between py-2 sm:py-2.5 md:py-3"
-      style={{ width: "var(--console-rail-w)" }}
+      className="hidden lg:flex shrink-0 flex-col items-center justify-between"
+      style={{
+        width: "var(--console-rail-w)",
+        paddingTop: "var(--console-rail-inset)",
+        paddingBottom: "var(--console-rail-inset)",
+      }}
     >
       {/* Section nav — pinned to the TOP of the rail. */}
       <div className="flex flex-col items-center gap-5">

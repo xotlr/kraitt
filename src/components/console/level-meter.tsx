@@ -191,7 +191,7 @@ export function ChannelStrip() {
           anodized metal without leaving the OLED-black brand. Two screws
           at top/bottom sell it as a bolted-on panel. */}
       <div
-        className="absolute inset-0 flex gap-1.5 rounded-[8px] px-1.5 py-2.5"
+        className="absolute inset-0 flex gap-1 rounded-[8px] px-1.5 py-2.5"
         style={{
           // Graphite, just off black, with a faint top→bottom sheen.
           background:
@@ -216,7 +216,7 @@ export function ChannelStrip() {
             75% travel (conventional 0 dB on a +6..-∞ taper). */}
         <div
           className="relative h-full shrink-0"
-          style={{ width: "16px", marginTop: "8px", marginBottom: "8px" }}
+          style={{ width: "14px", marginTop: "8px", marginBottom: "8px" }}
         >
           {/* Routed slot — a deep recessed channel. Dark fill + strong inset
               shadow on all sides reads as a groove milled into the plate. */}
@@ -252,7 +252,7 @@ export function ChannelStrip() {
             aria-hidden
             className="absolute left-1/2 -translate-x-1/2 rounded-[3px]"
             style={{
-              width: "16px",
+              width: "14px",
               height: `${CAP_H}px`,
               bottom: `calc(${volume} * (100% - ${SLOT_PAD * 2}px) + ${SLOT_PAD}px - ${CAP_H / 2}px)`,
               background:
@@ -303,68 +303,68 @@ export function ChannelStrip() {
 
         {/* ── METER ─────────────────────────────────────────────────────
             A recessed WINDOW cut into the plate, holding the segmented
-            dBFS ladder, with the printed scale in its own column to the
-            right. Row layout guarantees the ladder keeps real width.
-            Passive — displays the live signal, sets nothing. */}
-        <div className="relative flex h-full flex-1 gap-[3px]">
-          {/* Meter window — inset bezel around the ladder so it reads as a
-              display let into the faceplate, not segments floating on it. */}
+            dBFS ladder. The printed scale OVERLAYS the window's right edge
+            (absolute, no flex width) so the ladder keeps the full meter
+            width even at one-button rail width. Passive — displays the
+            live signal, sets nothing. */}
+        <div
+          className="relative flex h-full flex-1 flex-col-reverse gap-[2px] overflow-hidden rounded-[4px] p-[3px]"
+          style={{
+            background:
+              "linear-gradient(180deg, color-mix(in srgb, black 50%, transparent), color-mix(in srgb, black 32%, transparent))",
+            boxShadow: [
+              "inset 0 0 0 1px color-mix(in srgb, black 55%, transparent)",
+              "inset 0 2px 3px color-mix(in srgb, black 55%, transparent)",
+              "inset 0 -1px 0 color-mix(in srgb, white 5%, transparent)",
+            ].join(","),
+          }}
+        >
+          {Array.from({ length: SEGMENTS }).map((_, i) => {
+            // Each segment's dBFS threshold = its position on the floor..0
+            // scale, so we can colour it by zone.
+            const segDb = FLOOR_DB + ((i + 1) / SEGMENTS) * (0 - FLOOR_DB);
+            return (
+              <div
+                key={i}
+                ref={(el) => {
+                  segRefs.current[i] = el;
+                }}
+                className="w-full flex-1 rounded-[1.5px] transition-opacity duration-75"
+                style={{
+                  background: zoneColor(segDb),
+                  // color drives currentColor for the lit-segment halo.
+                  color: zoneColor(segDb),
+                  opacity: IDLE_OPACITY,
+                  minHeight: "2px",
+                }}
+              />
+            );
+          })}
+
+          {/* Peak-hold tick — a bright line riding the held peak. */}
           <div
-            className="relative flex h-full flex-1 flex-col-reverse gap-[2px] overflow-hidden rounded-[4px] p-[3px]"
-            style={{
-              background:
-                "linear-gradient(180deg, color-mix(in srgb, black 50%, transparent), color-mix(in srgb, black 32%, transparent))",
-              boxShadow: [
-                "inset 0 0 0 1px color-mix(in srgb, black 55%, transparent)",
-                "inset 0 2px 3px color-mix(in srgb, black 55%, transparent)",
-                "inset 0 -1px 0 color-mix(in srgb, white 5%, transparent)",
-              ].join(","),
-            }}
-          >
-            {Array.from({ length: SEGMENTS }).map((_, i) => {
-              // Each segment's dBFS threshold = its position on the floor..0
-              // scale, so we can colour it by zone.
-              const segDb = FLOOR_DB + ((i + 1) / SEGMENTS) * (0 - FLOOR_DB);
-              return (
-                <div
-                  key={i}
-                  ref={(el) => {
-                    segRefs.current[i] = el;
-                  }}
-                  className="w-full flex-1 rounded-[1.5px] transition-opacity duration-75"
-                  style={{
-                    background: zoneColor(segDb),
-                    // color drives currentColor for the lit-segment halo.
-                    color: zoneColor(segDb),
-                    opacity: IDLE_OPACITY,
-                    minHeight: "2px",
-                  }}
-                />
-              );
-            })}
+            ref={peakRef}
+            aria-hidden
+            className="pointer-events-none absolute left-[3px] right-[3px] h-[2px]"
+            style={{ bottom: "0%", background: "var(--meter-green)" }}
+          />
 
-            {/* Peak-hold tick — a bright line riding the held peak. */}
-            <div
-              ref={peakRef}
-              aria-hidden
-              className="pointer-events-none absolute left-[3px] right-[3px] h-[2px]"
-              style={{ bottom: "0%", background: "var(--meter-green)" }}
-            />
-          </div>
-
-          {/* Printed dBFS scale — mono ticks in their own narrow column. */}
+          {/* Printed dBFS scale — overlaid down the window's right edge,
+              right-aligned, with a subtle shadow so the digits read over
+              the lit segments. */}
           <div
             aria-hidden
-            className="flex h-full shrink-0 flex-col justify-between py-[2px]"
-            style={{ width: "13px" }}
+            className="pointer-events-none absolute inset-y-[3px] right-[2px] flex flex-col justify-between"
           >
             {SCALE_TICKS.map((db) => (
               <span
                 key={db}
-                className="font-mono leading-none text-ink-faint"
+                className="font-mono leading-none"
                 style={{
-                  fontSize: "5.5px",
-                  letterSpacing: "0.02em",
+                  fontSize: "5px",
+                  letterSpacing: "0.01em",
+                  color: "color-mix(in srgb, var(--color-ink) 65%, transparent)",
+                  textShadow: "0 0 2px rgba(0,0,0,0.9), 0 0 1px rgba(0,0,0,0.9)",
                 }}
               >
                 {db === FLOOR_DB ? "-∞" : db}

@@ -67,12 +67,14 @@
   --console-unit: 52px;
   --console-rail-pad: 14px; /* breathing room each side of a cap in the rail */
   --console-rail-w: calc(var(--console-unit) + var(--console-rail-pad) * 2);
-  /* The channel strip (fader + dBFS meter + printed scale) needs more
-     width than a single button cap to stay legible. It's the bottom
-     element of the LEFT rail only, so the left rail is widened to this
-     while the right rail keeps the narrow --console-rail-w. */
-  --console-strip-w: 68px;
-  --console-left-rail-w: calc(var(--console-strip-w) + var(--console-rail-pad) * 2);
+  /* The channel strip is exactly one button cap wide so the fader+meter
+     column lines up flush with the source buttons above it. Both rails
+     therefore share the same width. */
+  --console-strip-w: var(--console-unit);
+  --console-left-rail-w: var(--console-rail-w);
+  /* Vertical inset of the button GROUPS from the rail's top/bottom edges,
+     so the groups sit indented rather than flush. */
+  --console-rail-inset: clamp(1.25rem, 0.75rem + 1.5vh, 2.5rem);
 }
 
 /* ── Theming ──────────────────────────────────────────────────────────

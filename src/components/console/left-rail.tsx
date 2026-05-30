@@ -34,8 +34,12 @@ export function LeftRail() {
       variants={rail}
       initial="hidden"
       animate="show"
-      className="hidden lg:flex shrink-0 flex-col items-center gap-5 py-2 sm:py-2.5 md:py-3"
-      style={{ width: "var(--console-left-rail-w)" }}
+      className="hidden lg:flex shrink-0 flex-col items-center gap-5"
+      style={{
+        width: "var(--console-left-rail-w)",
+        paddingTop: "var(--console-rail-inset)",
+        paddingBottom: "var(--console-rail-inset)",
+      }}
     >
       {/* Brand plate — the wordmark sits at the top of the left rail, the
           desk's name tag. Given the same --console-unit box as a button so
