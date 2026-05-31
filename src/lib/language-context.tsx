@@ -11,16 +11,12 @@ import {
 } from "react";
 
 /**
- * Lightweight language state for the console's DE/EN toggle.
+ * Language state for the console's DE/EN toggle.
  *
- * SCOPE NOTE (honest): this holds and persists the selected language and
- * keeps <html lang> in sync, so the toggle is a real, functional control
- * — not a fake switch. It does NOT yet translate section copy; the site's
- * content is currently hardcoded German in the section components and
- * src/data. Wiring each string to `lang` is a separate content pass.
- * The context is the seam that pass will plug into (read `lang`, branch
- * copy), so adding it now is the right order of operations rather than
- * scope creep.
+ * Holds and persists the selected language and keeps <html lang> in sync.
+ * Section copy is translated: components read `lang` here and pull their
+ * strings from src/lib/i18n.ts (the DICT keyed by Lang). The toggle is a
+ * real control that swaps the whole site's copy, not just a label.
  */
 export type Lang = "de" | "en";
 

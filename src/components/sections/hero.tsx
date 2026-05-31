@@ -3,17 +3,38 @@
 import { motion, type Variants } from "framer-motion";
 import { useScrollTo } from "@/lib/scroll-context";
 import { useAudioGlow } from "@/hooks/use-audio-glow";
+import { useLanguage } from "@/lib/language-context";
+import { dict } from "@/lib/i18n";
 
-// Amber beat-glow for the wordmark — same treatment as section
-// headings (see section-heading.tsx). Layered gold text-shadow scaled
-// by --audio-glow; zero at rest, blooms on bass hits. The hero is
-// larger, so the bloom radii are a touch wider.
+// Audio-reactive COLOUR + GLOW. useAudioGlow writes two vars onto the heading
+// each frame: --audio-tint (a colour sampled from the desk's shared intensity
+// ramp — cold blue when quiet → gold on a peak) and --audio-glow (the raw 0..1
+// intensity). The "Sufian" line takes the tint directly; at rest both vars are
+// unset so it falls back to ink with no bloom.
+//
+// The text now LIGHTS UP as it shifts colour: a tint-coloured text-shadow whose
+// blur radius and opacity both scale with --audio-glow, so the wordmark sits
+// dark+flat in silence and blooms warm on a peak. --audio-glow is already eased
+// in the hook (one-pole smoothing) and the colour/shadow each carry a CSS
+// transition, so the rise and fall animate smoothly instead of snapping. Both
+// the colour and the glow go to zero at silence (the hook clears the tint and
+// drives glow to 0), so the bloom recedes on its own when the music stops.
 const heroGlowStyle: React.CSSProperties = {
   // @ts-expect-error — custom property, valid CSS, not in the TS type
   "--audio-glow": 0,
+  color: "var(--audio-tint, var(--color-ink))",
+  // Glow blooms in the live tint colour. Two stacked shadows: a tight core that
+  // lifts the glyph edges and a wide halo that spreads on peaks. Both fade to
+  // nothing as --audio-glow → 0 (color-mix alpha rides the var), and the blur
+  // radius grows with intensity. Falls back to a fully-transparent shadow when
+  // the tint is unset, so resting type casts no light.
   textShadow:
-    "0 0 calc(var(--audio-glow) * 18px) rgba(184, 132, 92, calc(var(--audio-glow) * 0.50)), " +
-    "0 0 calc(var(--audio-glow) * 44px) rgba(184, 132, 92, calc(var(--audio-glow) * 0.26))",
+    "0 0 calc(2px + var(--audio-glow, 0) * 6px) color-mix(in srgb, var(--audio-tint, transparent) calc(var(--audio-glow, 0) * 70%), transparent), " +
+    "0 0 calc(8px + var(--audio-glow, 0) * 26px) color-mix(in srgb, var(--audio-tint, transparent) calc(var(--audio-glow, 0) * 45%), transparent)",
+  // Ease the bloom + colour. The hook already one-pole-smooths --audio-glow, so
+  // the per-frame values arrive smooth; this short transition mainly softens the
+  // silence→onset and peak→decay edges without lagging behind fast beats.
+  transition: "text-shadow 90ms linear, color 90ms linear",
 };
 
 /* ------------------------------------------------------------------ */
@@ -97,6 +118,8 @@ function SplitWord({ word }: { word: string }) {
 export function Hero() {
   const scrollTo = useScrollTo();
   const titleRef = useAudioGlow<HTMLHeadingElement>();
+  const { lang } = useLanguage();
+  const t = dict(lang).hero;
   return (
     <section
       id="hero"
@@ -110,7 +133,7 @@ export function Hero() {
           className="eyebrow flex items-center gap-3"
         >
           <span className="h-px w-10 bg-ink-faint" />
-          Wien · Audio Engineer · Verfügbar 2026
+          {t.eyebrow}
         </motion.p>
       </div>
 
@@ -121,37 +144,31 @@ export function Hero() {
         className="relative z-10 container-edge"
       >
         {/*
-          Headline wrapper. Two responsibilities:
-          1. variants=letterStagger drives the per-letter reveal on mount.
-          2. animate={{ letterSpacing }} runs the perpetual "breathing"
-             once the reveal is done — letter-spacing drifts between the
-             base tightest tracking (-0.045em, set by .font-display) and
-             a hair looser (-0.040em) over 6s, mirror-eased, forever.
-             It's small on purpose: noticeable only peripherally, like
-             the title is inhaling.
+          Headline wrapper. variants=letterStagger drives the per-letter
+          reveal on mount (it inherits the parent's "show" state, which
+          cascades the stagger to the letter spans). After the reveal the
+          title sits STILL — the old perpetual letter-spacing "breathing"
+          loop was removed (it read as the title drifting/moving for no
+          reason). The only life on the wordmark now is the audio colour
+          tint (--audio-tint, via heroGlowStyle).
         */}
         <motion.h1
           ref={titleRef}
           style={heroGlowStyle}
           variants={letterStagger}
-          animate={{
-            letterSpacing: ["-0.045em", "-0.040em", "-0.045em"],
-            transition: {
-              duration: 6,
-              ease: "easeInOut",
-              repeat: Infinity,
-              // Start the breathing only after the letter reveal has
-              // had time to finish (8 letters * 0.025s + 1.1s duration
-              // + 0.5s block delay ~= 1.8s, round up).
-              delay: 2,
-            },
-          }}
           className="font-display text-display leading-[var(--text-display--line-height)] text-balance text-legible"
         >
           <span className="block" aria-label="Sufian">
             <SplitWord word="Sufian" />
           </span>
-          <span className="block text-ink-muted" aria-label="Kraitt.">
+          {/* "Kraitt" rests a step muted vs "Sufian", but shares the same
+              audio tint at intensity — fallback to ink-muted when the var
+              is unset so the two-tone wordmark holds while the music is off. */}
+          <span
+            className="block"
+            style={{ color: "var(--audio-tint, var(--color-ink-muted))" }}
+            aria-label="Kraitt."
+          >
             <SplitWord word="Kraitt" />
             {/* Dot picks up the string color so the wordmark belongs
                 to the same cold palette as the shader. On hover it
@@ -173,11 +190,12 @@ export function Hero() {
           variants={rise}
           className="mt-12 md:mt-16 max-w-[50ch] text-body-lg leading-[var(--text-body-lg--line-height)] text-ink/80 font-body text-legible"
         >
-          Audio für{" "}
-          <span className="font-serif-italic text-ink">Film</span>,{" "}
-          <span className="font-serif-italic text-ink">Television</span> und{" "}
-          <span className="font-serif-italic text-ink">Musikproduktion</span>{" "}
-          — am Set, im Studio, in der Post.
+          {t.leadIn}
+          <span className="font-serif-italic text-ink">{t.film}</span>,{" "}
+          <span className="font-serif-italic text-ink">{t.television}</span>
+          {lang === "de" ? " und " : ", "}
+          <span className="font-serif-italic text-ink">{t.music}</span>
+          {t.leadOut}
         </motion.p>
       </motion.div>
 
@@ -189,18 +207,16 @@ export function Hero() {
       >
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 eyebrow">
           <div className="flex flex-wrap gap-x-8 gap-y-3 text-ink-muted">
-            <span>Setton</span>
-            <span>Postproduktion</span>
-            <span>Mixing</span>
-            <span>Mastering</span>
-            <span>Komposition</span>
+            {t.tags.map((tag) => (
+              <span key={tag}>{tag}</span>
+            ))}
           </div>
           <a
             href="#ueber"
             onClick={scrollTo("ueber")}
             className="group inline-flex items-center gap-3 text-ink-muted hover:text-ink transition-colors"
           >
-            Scroll
+            {t.scroll}
             <span className="block h-px w-12 bg-current group-hover:w-20 transition-all duration-700" />
           </a>
         </div>

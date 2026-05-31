@@ -66,6 +66,33 @@ type LevelsRef = {
    *  remembers the last value it saw and fires a manual ripple whenever
    *  it changes. */
   pulse: number;
+  /** Honest programme loudness, 0..1, for the METERS (VU needle + clip).
+   *
+   *  This is deliberately NOT the bass/mid/high values. Those are *reactive*
+   *  (energy above a rolling baseline) — tuned for the shader so a steady
+   *  piano doesn't peg the terrain forever. A meter needs the opposite: it
+   *  should read actual LOUDNESS, the way a real VU does. So `rms` is a true
+   *  full-band RMS of the spectrum, SCALED BY THE FADER (post-fade metering),
+   *  with proper ~300ms symmetric VU ballistics applied in the meter itself.
+   *  Riding the fader down pulls the needle down — which is what "how the
+   *  registry impacts the volume thing" should mean. */
+  rms: number;
+  /** Pre-ballistics peak of the post-fade signal, 0..1 — the clip latch
+   *  watches this so "clip" means the signal actually pinned the ceiling. */
+  peak: number;
+  /** Honest per-band ENERGY for the EQ display, 0..1, post-fade.
+   *
+   *  Like `rms` but split into the three bands and WITHOUT the rolling-baseline
+   *  subtraction that bass/mid/high carry. The reactive bass/mid/high collapse
+   *  to ~0 once their ~5s baseline catches a sustained level — correct for the
+   *  shader (a steady track shouldn't peg the terrain forever) but WRONG for an
+   *  EQ, where it read as "bars start high, then sink to ~10% even at full
+   *  volume". These stay up as long as the band is loud, so the EQ shows actual
+   *  spectrum. PRE-fade — the EQ applies the fader itself as a visual ceiling,
+   *  so these must not be fader-scaled (that would attenuate twice). */
+  bassLevel: number;
+  midLevel: number;
+  highLevel: number;
 };
 const LevelsContext = createContext<{ current: LevelsRef } | null>(null);
 
@@ -84,6 +111,11 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const ctxRef = useRef<globalThis.AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const fftBufRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
+  // Time-domain (waveform) buffer — the METER reads loudness from this, not
+  // from the FFT. getByteFrequencyData returns dB-domain bytes, which are
+  // useless for an RMS loudness reading; the raw waveform samples are the
+  // honest signal a VU integrates.
+  const waveBufRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
 
   // Music graph
   const audioElRef = useRef<HTMLAudioElement | null>(null);
@@ -122,6 +154,11 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   // Live mute state read inside setVolume without re-creating the callback
   // (so its identity stays stable in the context value).
   const mutedRef = useRef(false);
+  // Live fader value, mirrored for the metering tick so it can scale the RMS
+  // by the set volume (post-fade metering) without re-subscribing the effect
+  // on every fader move.
+  const volumeRef = useRef(DEFAULT_VOLUME);
+  volumeRef.current = volume;
 
   const setVolume = useCallback((v: number) => {
     const clamped = Math.max(0, Math.min(1, v));
@@ -158,7 +195,17 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
   // Levels object shared by reference with the shader hook. We mutate
   // .bass/.mid/.high in place each frame; React does not re-render.
-  const levelsRef = useRef<LevelsRef>({ bass: 0, mid: 0, high: 0, pulse: 0 });
+  const levelsRef = useRef<LevelsRef>({
+    bass: 0,
+    mid: 0,
+    high: 0,
+    pulse: 0,
+    rms: 0,
+    peak: 0,
+    bassLevel: 0,
+    midLevel: 0,
+    highLevel: 0,
+  });
 
   // Manual pluck — bumps the pulse counter the shader watches. useCallback
   // so its identity is stable in the context value.
@@ -185,6 +232,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     fftBufRef.current = new Uint8Array(
       new ArrayBuffer(analyser.frequencyBinCount)
     );
+    // Time-domain buffer is fftSize long (one sample per slot), not
+    // frequencyBinCount (half that).
+    waveBufRef.current = new Uint8Array(new ArrayBuffer(analyser.fftSize));
     return ctx;
   }, []);
 
@@ -284,7 +334,19 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         lv.bass *= 1 - RELEASE;
         lv.mid *= 1 - RELEASE;
         lv.high *= 1 - RELEASE;
-        if (lv.bass + lv.mid + lv.high > 0.001) {
+        // Meter signals ease back to rest on the slow VU fall so the needle
+        // glides home rather than snapping — same ballistics as the rise.
+        lv.rms *= 1 - 0.06;
+        lv.peak = 0;
+        // EQ bars fall back smoothly too.
+        lv.bassLevel *= 1 - 0.12;
+        lv.midLevel *= 1 - 0.12;
+        lv.highLevel *= 1 - 0.12;
+        if (
+          lv.bass + lv.mid + lv.high + lv.rms +
+            lv.bassLevel + lv.midLevel + lv.highLevel >
+          0.001
+        ) {
           raf = requestAnimationFrame(tick);
         }
       };
@@ -293,7 +355,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     }
     const analyser = analyserRef.current;
     const buf = fftBufRef.current;
-    if (!analyser || !buf) return;
+    const wave = waveBufRef.current;
+    if (!analyser || !buf || !wave) return;
     let raf = 0;
     const sampleRate = ctxRef.current?.sampleRate ?? 48000;
     const nyquist = sampleRate / 2;
@@ -312,6 +375,17 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     // visual never animates.
     const baselines = { bass: 0, mid: 0, high: 0 };
     const BASELINE_COEFF = 0.008; // ~5s time constant at 60fps
+
+    // VU ballistics. A real VU integrates with a ~300ms rise/fall — the
+    // needle's mass averages the signal. At ~60fps a one-pole coefficient of
+    // ~0.06 gives roughly that 300ms time constant, applied SYMMETRICALLY
+    // (same up and down) the way a passive needle behaves. This is what makes
+    // the meter read smooth programme LOUDNESS instead of jittering on every
+    // frame. We integrate the post-fade RMS here so the value the meter reads
+    // is already ballistically correct and the VU component just maps it to
+    // an angle.
+    const VU_COEFF = 0.06;
+    let rmsBallistic = 0;
 
     const tick = () => {
       analyser.getByteFrequencyData(buf);
@@ -337,6 +411,65 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       const bass = bN ? bSum / bN : 0;
       const mid = mN ? mSum / mN : 0;
       const high = hN ? hSum / hN : 0;
+
+      // ── METER signal (honest loudness, post-fade) ──────────────────────
+      // True RMS of the WAVEFORM, not the FFT. getByteTimeDomainData gives the
+      // raw samples centred at 128; (s-128)/128 is the signal in -1..1. The
+      // RMS of that is real loudness — the quantity a VU integrates. (The old
+      // version RMS'd getByteFrequencyData, whose bytes are dB-domain magnitudes
+      // spread across 512 mostly-empty bins, so a loud song still averaged to
+      // near zero and the needle never left the floor. This is the fix.)
+      analyser.getByteTimeDomainData(wave);
+      let sumSq = 0;
+      let peakSample = 0;
+      for (let i = 0; i < wave.length; i++) {
+        const s = (wave[i] - 128) / 128; // -1..1
+        sumSq += s * s;
+        const abs = s < 0 ? -s : s;
+        if (abs > peakSample) peakSample = abs;
+      }
+      const rmsLinear = Math.sqrt(sumSq / wave.length); // 0..~1
+      // Map linear RMS → meter throw. Real (compressed) music sits around
+      // 0.1–0.2 linear RMS, so a flat ×2.6 left a loud track reading only ~30%.
+      // We want a loud track up near the top. A gentle perceptual curve
+      // (sqrt-ish via pow 0.7) lifts the low-mid range where music lives, then
+      // a gain puts a typical loud passage at ~0.8–0.95 without instantly
+      // pinning — quiet passages still sit low, so it's not just slammed to max.
+      const rmsRaw = Math.min(1, Math.pow(rmsLinear, 0.7) * 3.0);
+      const faderGain = mutedRef.current ? 0 : volumeRef.current;
+      const rmsPostFade = rmsRaw * faderGain;
+      // 300ms symmetric VU integration.
+      rmsBallistic += (rmsPostFade - rmsBallistic) * VU_COEFF;
+      const lvMeter = levelsRef.current;
+      lvMeter.rms = rmsBallistic;
+      // Instantaneous post-fade peak — clip latch watches this (no ballistics;
+      // a clip is a peak event, the needle is the slow one).
+      lvMeter.peak = Math.min(1, peakSample) * faderGain;
+
+      // ── EQ band ENERGY (honest, PRE-fade, NO baseline) ─────────────────
+      // The raw band averages (bass/mid/high above) are 0..1 spectral energy.
+      // Gain them into a useful display range and lightly smooth (fast up,
+      // slower down) so the bars track the music's spectrum and STAY up while
+      // it's loud — unlike the reactive lv.bass/mid/high below, which sink to
+      // baseline. These are PRE-fade: the EQ shows the source's spectrum, and
+      // the EQ applies the fader separately as a visual CEILING (segments above
+      // the set volume render disabled), so we must NOT also scale by the fader
+      // here or the level would be attenuated twice. BAND_DISPLAY_GAIN spreads
+      // quiet content up the column without pinning loud content.
+      const BAND_DISPLAY_GAIN = 1.9;
+      const targets = [
+        Math.min(1, bass * BAND_DISPLAY_GAIN),
+        Math.min(1, mid * BAND_DISPLAY_GAIN),
+        Math.min(1, high * BAND_DISPLAY_GAIN),
+      ];
+      const cur = [lvMeter.bassLevel, lvMeter.midLevel, lvMeter.highLevel];
+      for (let k = 0; k < 3; k++) {
+        const t = targets[k];
+        cur[k] += (t - cur[k]) * (t > cur[k] ? 0.5 : 0.12);
+      }
+      lvMeter.bassLevel = cur[0];
+      lvMeter.midLevel = cur[1];
+      lvMeter.highLevel = cur[2];
 
       // Update baselines toward instant.
       baselines.bass += (bass - baselines.bass) * BASELINE_COEFF;

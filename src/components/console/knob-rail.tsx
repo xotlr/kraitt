@@ -15,6 +15,9 @@ import { ThemeToggle } from "@/components/console/theme-toggle";
 import { useActiveSection } from "@/components/console/use-active-section";
 import { useAudio } from "@/lib/audio";
 import { useScrollTo } from "@/lib/scroll-context";
+import { useLanguage } from "@/lib/language-context";
+import { dict } from "@/lib/i18n";
+import type { Dict } from "@/lib/i18n";
 
 /**
  * KnobRail — the RIGHT console column: ALL the tactile controls. The LEFT
@@ -39,6 +42,9 @@ const item: Variants = {
 export function KnobRail() {
   const active = useActiveSection();
   const scrollTo = useScrollTo();
+  const { lang } = useLanguage();
+  const c = dict(lang).console;
+  const nav = dict(lang).nav;
   const { musicOn, micOn, musicStatus, muted, toggleMute, toggleMusic, toggleMic, triggerPulse } =
     useAudio();
   const audioOff = !musicOn && !micOn;
@@ -92,11 +98,7 @@ export function KnobRail() {
             disabled={musicStatus === "unavailable"}
             onClick={toggleMusic}
             ariaLabel={
-              musicStatus === "unavailable"
-                ? "Musik — nicht verfügbar"
-                : musicOn
-                  ? "Pause"
-                  : "Wiedergabe"
+              musicStatus === "unavailable" ? c.musicUnavailable : c.music
             }
           >
             {musicOn ? (
@@ -110,7 +112,7 @@ export function KnobRail() {
             tone="rec"
             dot
             onClick={toggleMic}
-            ariaLabel="Mikrofon"
+            ariaLabel={c.mic}
           >
             <Microphone size={19} weight={micOn ? "fill" : "regular"} />
           </StudioButton>
@@ -120,7 +122,7 @@ export function KnobRail() {
             tone="rec"
             dot
             onClick={toggleMute}
-            ariaLabel={muted ? "Stumm aufheben" : "Stummschalten"}
+            ariaLabel={muted ? c.unmute : c.mute}
           >
             {muted ? (
               <SpeakerSimpleSlash size={18} weight="fill" />
@@ -143,7 +145,7 @@ export function KnobRail() {
                 active={isActive}
                 dot
                 onClick={handleSection(s.id)}
-                ariaLabel={s.label}
+                ariaLabel={nav[s.id as keyof Dict["nav"]] ?? s.label}
                 ariaCurrent={isActive}
               >
                 <Icon size={18} weight={isActive ? "fill" : "regular"} />

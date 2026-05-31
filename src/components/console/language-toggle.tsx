@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { FlagAT, FlagGB } from "@/components/console/flags";
 import { StudioButton } from "@/components/console/studio-button";
 import { useLanguage } from "@/lib/language-context";
+import { dict } from "@/lib/i18n";
 
 /**
  * LanguageToggle — the DE/EN switch as a console button showing the
@@ -20,7 +21,7 @@ export function LanguageToggle({ iconSize = 20 }: { iconSize?: number }) {
   return (
     <StudioButton
       onClick={toggle}
-      ariaLabel={`Sprache: ${lang.toUpperCase()} — umschalten`}
+      ariaLabel={dict(lang).console.language(lang.toUpperCase())}
     >
       {/* Clip slot: flags roll through this; overflow-hidden + sized to the
           flag so the entering/exiting flag is masked above and below. */}

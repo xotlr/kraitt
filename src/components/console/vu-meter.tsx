@@ -10,9 +10,13 @@ import { useAudio, useAudioLevels } from "@/lib/audio";
  * meter zones (green → amber → red). So it matches the console's palette and
  * reads as part of the same instrument, not a skeuomorphic antique pasted on.
  *
- * Accuracy: the needle tracks the SAME programme level the dBFS ladder shows
- * (bass-weighted with a little high), with slow needle ballistics so it swings
- * smoothly. Needle + ladder therefore agree on the level.
+ * Accuracy: the needle tracks the honest post-fade RMS programme level
+ * (`levels.current.rms`) — a true full-band RMS scaled by the fader, with
+ * ~300ms symmetric VU ballistics already applied in the audio engine. So the
+ * needle reads real LOUDNESS and answers to the volume fader: ride the fader
+ * down and the needle falls. (The bass/mid/high reactive values still drive
+ * the shader + EQ; the meter deliberately does not use them — a beat-reactive
+ * value is wrong for a loudness meter.)
  *
  * rAF-driven via a direct transform + colour write (no React re-render per
  * frame). Idle/reduced-motion: needle parks at rest (hard left).
@@ -50,10 +54,11 @@ export function VuMeter() {
     let v = 0;
     const tick = () => {
       const a = levels.current;
-      // Same programme weighting the dBFS ladder uses, so they agree.
-      const drive = Math.min(1, a.bass * 0.9 + a.high * 0.35);
-      // Slow, smooth needle swing.
-      v += (drive - v) * 0.16;
+      // Honest post-fade loudness — ballistics already applied upstream. A
+      // light extra one-pole only cleans residual frame jitter; the real
+      // 300ms VU integration lives in the engine.
+      const drive = Math.min(1, a.rms);
+      v += (drive - v) * 0.35;
       const deg = MIN_DEG + v * (MAX_DEG - MIN_DEG);
       if (needleRef.current) {
         needleRef.current.setAttribute(

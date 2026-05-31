@@ -2,6 +2,8 @@
 
 import { motion, type Variants } from "framer-motion";
 import { SectionHeading } from "@/components/section-heading";
+import { useLanguage } from "@/lib/language-context";
+import { dict } from "@/lib/i18n";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -39,51 +41,10 @@ const drawX: Variants = {
   visible: { scaleX: 1, transition: { duration: 0.9, ease: EASE } },
 };
 
-type Column = {
-  heading: string;
-  index: string;
-  items: { name: string; desc: string }[];
-};
-
-const columns: Column[] = [
-  {
-    heading: "Film & TV",
-    index: "A",
-    items: [
-      { name: "Setton", desc: "On-location recording." },
-      { name: "Tonassistenz", desc: "Boom, wireless, support." },
-      { name: "Audiopostproduktion", desc: "Edit, design, mix." },
-      { name: "Sprachbearbeitung", desc: "ADR, dialog clean-up." },
-      { name: "Broadcast Audio", desc: "TV-konforme Mischung." },
-    ],
-  },
-  {
-    heading: "Studio & Musik",
-    index: "B",
-    items: [
-      { name: "Bandrecordings", desc: "Live im Raum, ehrlich." },
-      { name: "Vocal Recording", desc: "Stimme als Hauptdarsteller." },
-      { name: "Musikproduktion", desc: "Vom Demo zum Master." },
-      { name: "Mixing", desc: "Hybrid, in-the-box." },
-      { name: "Mastering", desc: "Final translation." },
-      { name: "Komposition", desc: "Score und Sounddesign." },
-    ],
-  },
-  {
-    heading: "Content & Medien",
-    index: "C",
-    items: [
-      { name: "Podcast Recording", desc: "Mehrere Stimmen, ein Raum." },
-      { name: "Audiorestauration", desc: "Archive retten." },
-      { name: "Audio Cleanup", desc: "Rauschen, Hall, Artefakte." },
-      { name: "Sprachaufnahmen", desc: "Voiceover, Hörbuch, IVR." },
-      { name: "Social Media Audio", desc: "Mobil optimiert." },
-      { name: "Voiceover", desc: "Werbung, Erklärfilme." },
-    ],
-  },
-];
-
 export function Leistungen() {
+  const { lang } = useLanguage();
+  const t = dict(lang).leistungen;
+  const columns = t.columns;
   return (
     <section
       id="leistungen"
@@ -92,12 +53,12 @@ export function Leistungen() {
       <div className="relative z-10 container-edge">
         <SectionHeading
           index="03"
-          label="Leistungen"
+          label={t.label}
           title={
             <>
-              Was ich{" "}
-              <span className="font-serif-italic text-ink">tue</span>, wenn ich
-              arbeite.
+              {t.titleA}
+              <span className="font-serif-italic text-ink">{t.titleEm}</span>
+              {t.titleB}
             </>
           }
         />

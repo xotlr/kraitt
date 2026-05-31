@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { SpectrumEq } from "@/components/console/spectrum-eq";
 import { VuMeter } from "@/components/console/vu-meter";
 import { useAudio, useAudioLevels } from "@/lib/audio";
+import { useLanguage } from "@/lib/language-context";
+import { dict } from "@/lib/i18n";
+import { INTENSITY_RAMP, intensityColor } from "@/lib/utils";
 
 /**
  * ChannelStrip — a real console channel strip, not a grey volume bar.
@@ -48,29 +51,17 @@ function snapVolume(v: number): number {
   return best;
 }
 
-// The SAME on-theme ramp the EQ uses (cold blue → purple-blue → silver →
-// gold), so the volume handle's colour matches the EQ colour AT the handle's
-// height and transitions smoothly as you ride the fader — no hard zone cuts.
-const VOL_RAMP: [number, number, number][] = [
-  [0x52, 0x61, 0x7f],
-  [0x6f, 0x6f, 0x96],
-  [0xaa, 0xb0, 0xc0],
-  [0xc2, 0xa5, 0x78],
-];
-/** Smoothly sample the ramp at volume v (0..1) → an rgb() string. */
-function faderZoneColor(v: number): string {
-  const seg = v * (VOL_RAMP.length - 1);
-  const i = Math.min(VOL_RAMP.length - 2, Math.floor(seg));
-  const t = seg - i;
-  const a = VOL_RAMP[i];
-  const b = VOL_RAMP[i + 1];
-  const m = (j: number) => Math.round(a[j] + (b[j] - a[j]) * t);
-  return `rgb(${m(0)}, ${m(1)}, ${m(2)})`;
-}
+// The fader fill samples the SHARED intensity ramp (cold blue → purple-blue
+// → silver → gold) at the handle's height — the same ramp the EQ, the lit
+// buttons, and the editorial type use, so "intensity" reads as one colour
+// language across the whole desk. See INTENSITY_RAMP in lib/utils.
+const faderZoneColor = (v: number) => intensityColor(v, INTENSITY_RAMP);
 
 export function ChannelStrip() {
   const levels = useAudioLevels();
   const { volume, setVolume, musicOn, micOn } = useAudio();
+  const { lang } = useLanguage();
+  const m = dict(lang).meter;
   const active = musicOn || micOn;
   // Colour of the fader's level fill at the current volume (see helper).
   const faderZone = faderZoneColor(volume);
@@ -99,7 +90,9 @@ export function ChannelStrip() {
     let raf = 0;
     const tick = () => {
       const a = levels.current;
-      const drive = Math.min(1, a.bass * 0.9 + a.high * 0.35);
+      // Honest post-fade peak — clip means the signal actually pinned the
+      // ceiling at the set fader level, not that a beat spiked above baseline.
+      const drive = a.peak;
       // Latch the clip once on the rising edge; the user clears it.
       if (drive >= 0.985 && !clippedRef.current) {
         clippedRef.current = true;
@@ -239,7 +232,7 @@ export function ChannelStrip() {
           onPointerCancel={() => setGrabbed(false)}
           onFocus={() => setGrabbed(true)}
           onBlur={() => setGrabbed(false)}
-          aria-label="Lautstärke (Fader)"
+          aria-label={m.fader}
           aria-valuetext={`${Math.round(volume * 100)} %`}
           className="fader-input absolute inset-0 z-20 h-full w-full cursor-ns-resize"
         />
@@ -248,7 +241,7 @@ export function ChannelStrip() {
         <button
           type="button"
           onClick={clearClip}
-          aria-label={clipped ? "Clip — zum Zurücksetzen klicken" : "Pegel ok"}
+          aria-label={clipped ? m.clip : m.levelOk}
           className="absolute left-1/2 top-[1px] z-30 flex -translate-x-1/2 items-center justify-center rounded-[3px]"
           style={{
             width: "16px",

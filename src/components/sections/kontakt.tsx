@@ -2,6 +2,8 @@
 
 import { motion, type Variants } from "framer-motion";
 import { SectionHeading } from "@/components/section-heading";
+import { useLanguage } from "@/lib/language-context";
+import { dict } from "@/lib/i18n";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -56,6 +58,8 @@ const links: { label: string; href: string }[] = [
 ];
 
 export function Kontakt() {
+  const { lang } = useLanguage();
+  const t = dict(lang).kontakt;
   return (
     <section
       id="kontakt"
@@ -64,12 +68,12 @@ export function Kontakt() {
       <div className="relative z-10 container-edge">
         <SectionHeading
           index="05"
-          label="Kontakt"
+          label={t.label}
           title={
             <>
-              Lass uns über das{" "}
-              <span className="font-serif-italic text-ink">Klangbild</span>{" "}
-              sprechen.
+              {t.titleA}
+              <span className="font-serif-italic text-ink">{t.titleEm}</span>
+              {t.titleB}
             </>
           }
         />
@@ -99,7 +103,7 @@ export function Kontakt() {
               style={{ transformOrigin: "left center" }}
               className="block h-px w-10 bg-ink-muted"
             />
-            E-Mail schreiben
+            {t.write}
           </motion.span>
         </motion.a>
 
@@ -118,7 +122,7 @@ export function Kontakt() {
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-8">
             <motion.div variants={fadeUp} className="space-y-2 eyebrow">
               <p className="text-ink/80">Sufian Kraitt</p>
-              <p>Audio Engineer · Wien, AT</p>
+              <p>{t.role}</p>
             </motion.div>
 
             <motion.ul
@@ -140,7 +144,7 @@ export function Kontakt() {
             </motion.ul>
 
             <motion.p variants={fadeUp} className="eyebrow text-ink-faint">
-              © {new Date().getFullYear()} · All rights reserved.
+              © {new Date().getFullYear()} · {t.rights}
             </motion.p>
           </div>
         </motion.footer>

@@ -80,10 +80,23 @@ export function StudioButton({
   const toneColor = TONE_COLOR[tone];
   // A seated, pressed-in cap only when the button genuinely latches.
   const latched = active && latch;
-  // Beat pulse — writes --audio-glow (0..1) on the cap each frame from the
-  // shared audio levels. The active icon's glow scales with it, so a lit
-  // button breathes with the music. Idle buttons set the var too but don't
-  // read it (no glow), so nothing strobes — only active caps pulse.
+  // Beat tint — useAudioGlow writes BOTH --audio-glow (0..1 scalar) and
+  // --audio-tint (a colour on the desk's shared intensity ramp) on the icon
+  // each frame. nav + play buttons RAMP their active colour with intensity:
+  // cold blue when the music is quiet, gold on a peak — the same journey the
+  // fader fill takes. rec (mic/record/mute) stays its semantic red regardless,
+  // so an armed input is never mistaken for "low intensity". Idle buttons
+  // write the vars too but don't read them, so nothing recolours until lit.
+  // Only LATCHING toggles ramp (sections, sources) — they seat in and read as
+  // "driven by the signal". Always-lit indicator buttons (theme/language,
+  // latch=false) keep their static tone so they don't go cold/"off"-looking in
+  // silence. rec stays semantic red either way.
+  const rampsWithIntensity = tone !== "rec" && latch;
+  // The active icon/LED colour: ramped tones read the live tint (falling back
+  // to the tone's own colour before the first audio frame); rec is fixed.
+  const activeColor = rampsWithIntensity
+    ? `var(--audio-tint, ${toneColor})`
+    : toneColor;
   const glowRef = useAudioGlow<HTMLSpanElement>();
   return (
     <button
@@ -105,6 +118,7 @@ export function StudioButton({
       style={{ borderRadius: "var(--console-cap-radius, 7px)" }}
     >
       <motion.span
+        ref={glowRef}
         className={cn(
           "relative flex items-center justify-center",
           // The icon takes the function tone on active; idle is muted ink.
@@ -127,9 +141,11 @@ export function StudioButton({
           // trough rather than a sharp chip sitting in it. Falls back to 7px
           // when there's no enclosing group var.
           borderRadius: "var(--console-cap-radius, 7px)",
-          // Active icon = the function tone (amber nav / green play / red
-          // rec). Idle inherits the muted-ink class above.
-          color: active ? toneColor : undefined,
+          // Active icon colour. nav + play RAMP with audio intensity (cold blue
+          // → gold via --audio-tint, written here by useAudioGlow); rec stays
+          // its semantic red. Idle inherits the muted-ink class above. The
+          // glyph's drop-shadow (inner span) reads --audio-glow for the pulse.
+          color: active ? activeColor : undefined,
           transition: "color 200ms, box-shadow 220ms ease-out, background 220ms",
           // Graphite cap milled into the panel. IDLE: the cap sits LIGHTER
           // than the panel (--console-cap), a lit top bevel (--console-cap-hi)
@@ -185,9 +201,9 @@ export function StudioButton({
             aria-hidden
             className="absolute right-1.5 top-1.5 h-[3px] w-[3px] rounded-full transition-all duration-300"
             style={{
-              background: active ? toneColor : "var(--color-ink-faint)",
+              background: active ? activeColor : "var(--color-ink-faint)",
               boxShadow: active
-                ? `0 0 5px color-mix(in srgb, ${toneColor} 90%, transparent), 0 0 1px color-mix(in srgb, ${toneColor} 100%, transparent)`
+                ? `0 0 5px color-mix(in srgb, ${activeColor} 90%, transparent), 0 0 1px color-mix(in srgb, ${activeColor} 100%, transparent)`
                 : "inset 0 0 1px color-mix(in srgb, black 60%, transparent)",
             }}
           />
@@ -197,19 +213,20 @@ export function StudioButton({
             the whole cap haloing. Full when active; a faint bloom fades in on
             hover for idle caps. */}
         <span
-          ref={glowRef}
           className={cn(
             "relative inline-flex",
             !active && !disabled && "group-hover:[filter:var(--icon-glow-hover)]"
           )}
           style={
             {
-              "--audio-glow": 0,
-              // Active glow = a steady base bloom PLUS a beat-driven bloom whose
-              // radius + opacity scale with --audio-glow, so the lit icon pulses
-              // on the beat. Idle uses no filter; hover uses the static bloom.
+              // --audio-glow / --audio-tint inherit from the parent span (which
+              // carries the useAudioGlow ref). Active glow = a steady base bloom
+              // PLUS a beat-driven bloom whose radius + opacity scale with
+              // --audio-glow, so the lit icon pulses on the beat. The bloom
+              // colour tracks the icon colour (ramped tint for nav/play, tone
+              // for rec). Idle: no filter; hover: static bloom.
               filter: active
-                ? `drop-shadow(0 0 2px color-mix(in srgb, ${toneColor} 60%, transparent)) drop-shadow(0 0 calc(4px + var(--audio-glow) * 7px) color-mix(in srgb, ${toneColor} calc(45% + var(--audio-glow) * 45%), transparent))`
+                ? `drop-shadow(0 0 2px color-mix(in srgb, ${activeColor} 60%, transparent)) drop-shadow(0 0 calc(4px + var(--audio-glow) * 7px) color-mix(in srgb, ${activeColor} calc(45% + var(--audio-glow) * 45%), transparent))`
                 : undefined,
               "--icon-glow-hover": `drop-shadow(0 0 4px color-mix(in srgb, ${toneColor} 45%, transparent))`,
             } as React.CSSProperties

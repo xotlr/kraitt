@@ -9,6 +9,9 @@ import { ThemeToggle } from "@/components/console/theme-toggle";
 import { useActiveSection } from "@/components/console/use-active-section";
 import { useAudio } from "@/lib/audio";
 import { useScrollTo } from "@/lib/scroll-context";
+import { useLanguage } from "@/lib/language-context";
+import { dict } from "@/lib/i18n";
+import type { Dict } from "@/lib/i18n";
 
 /**
  * ConsolePanel — the mobile console. Below lg the same controls fold into
@@ -22,6 +25,9 @@ import { useScrollTo } from "@/lib/scroll-context";
 export function ConsolePanel() {
   const active = useActiveSection();
   const scrollTo = useScrollTo();
+  const { lang } = useLanguage();
+  const c = dict(lang).console;
+  const nav = dict(lang).nav;
   const { musicOn, micOn, musicStatus, toggleMusic, toggleMic, triggerPulse } =
     useAudio();
   const audioOff = !musicOn && !micOn;
@@ -52,7 +58,7 @@ export function ConsolePanel() {
                 active={isActive}
                 size={42}
                 onClick={handleSection(s.id)}
-                ariaLabel={s.label}
+                ariaLabel={nav[s.id as keyof Dict["nav"]] ?? s.label}
                 ariaCurrent={isActive}
               >
                 <Icon size={17} weight={isActive ? "fill" : "regular"} />
@@ -75,11 +81,7 @@ export function ConsolePanel() {
               disabled={musicStatus === "unavailable"}
               onClick={toggleMusic}
               ariaLabel={
-                musicStatus === "unavailable"
-                  ? "Musik — nicht verfügbar"
-                  : musicOn
-                    ? "Pause"
-                    : "Wiedergabe"
+                musicStatus === "unavailable" ? c.musicUnavailable : c.music
               }
             >
               {musicOn ? (
@@ -94,7 +96,7 @@ export function ConsolePanel() {
               dot
               size={42}
               onClick={toggleMic}
-              ariaLabel="Mikrofon"
+              ariaLabel={c.mic}
             >
               <Microphone size={19} weight={micOn ? "fill" : "regular"} />
             </StudioButton>

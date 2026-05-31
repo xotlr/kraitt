@@ -105,7 +105,12 @@ export function SpectrumEq() {
 
     const tick = () => {
       const a = levels.current;
-      const raw = [a.bass, a.mid, a.high];
+      // Honest per-band ENERGY (bassLevel/midLevel/highLevel), NOT the reactive
+      // bass/mid/high. The reactive values subtract a ~5s rolling baseline, so
+      // a sustained loud track sank the bars to ~10% after a few seconds; these
+      // stay up with the music. Already gained + smoothed in the engine; a light
+      // extra one-pole here just cleans frame jitter.
+      const raw = [a.bassLevel, a.midLevel, a.highLevel];
       const vol = volRef.current;
       for (let b = 0; b < 3; b++) {
         const target = Math.min(1, raw[b]);

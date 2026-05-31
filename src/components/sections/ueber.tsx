@@ -2,6 +2,8 @@
 
 import { motion, type Variants } from "framer-motion";
 import { SectionHeading } from "@/components/section-heading";
+import { useLanguage } from "@/lib/language-context";
+import { dict } from "@/lib/i18n";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -29,14 +31,9 @@ const drawX: Variants = {
   visible: { scaleX: 1, transition: { duration: 0.9, ease: EASE } },
 };
 
-const facts = [
-  { k: "Basis", v: "Wien, AT" },
-  { k: "Ausbildung", v: "SAE Institute" },
-  { k: "Sprachen", v: "DE · EN · AR" },
-  { k: "Arbeitet seit", v: "2018" },
-];
-
 export function Ueber() {
+  const { lang } = useLanguage();
+  const t = dict(lang).ueber;
   return (
     <section
       id="ueber"
@@ -45,12 +42,12 @@ export function Ueber() {
       <div className="relative z-10 container-edge">
         <SectionHeading
           index="02"
-          label="Über"
+          label={t.label}
           title={
             <>
-              Ein Ohr für den{" "}
-              <span className="font-serif-italic text-ink">Raum zwischen</span>{" "}
-              den Tönen.
+              {t.titleA}
+              <span className="font-serif-italic text-ink">{t.titleEm}</span>
+              {t.titleB}
             </>
           }
         />
@@ -64,24 +61,17 @@ export function Ueber() {
             className="lg:col-span-7 lg:col-start-2 space-y-7 text-body-lg leading-[var(--text-body-lg--line-height)] text-ink/80 font-body text-pretty text-legible"
           >
             <motion.p variants={fadeUp}>
-              Mein Weg in die Audiowelt begann mit der Frage, warum manche
-              Aufnahmen{" "}
-              <span className="font-serif-italic text-ink">da</span> sind und
-              andere nicht. Heute arbeite ich an dieser Antwort jeden Tag —
-              zwischen Tonangel und Mischpult, zwischen Set und Studio.
+              {t.p1a}
+              <span className="font-serif-italic text-ink">{t.p1Em}</span>
+              {t.p1b}
             </motion.p>
             <motion.p variants={fadeUp}>
-              Nach meinem Abschluss am{" "}
-              <span className="font-serif-italic text-ink">SAE Institute</span>{" "}
-              habe ich mich auf den schmalen Grat zwischen technischer
-              Präzision und gestalterischer Intuition spezialisiert. Film und TV
-              verlangen Disziplin und Geschwindigkeit; Musik verlangt Geduld und
-              Haltung. Beides interessiert mich gleichermaßen.
+              {t.p2a}
+              <span className="font-serif-italic text-ink">{t.p2Em}</span>
+              {t.p2b}
             </motion.p>
             <motion.p variants={fadeUp} className="text-ink-muted">
-              Ich arbeite für ORF-Produktionen, Spielfilme, Kurzfilme,
-              Dokumentationen und für Bands, die wissen, dass ein Song sich
-              entscheidet, bevor er gemischt wird.
+              {t.p3}
             </motion.p>
           </motion.div>
 
@@ -93,7 +83,7 @@ export function Ueber() {
             className="lg:col-span-3 lg:col-start-10"
           >
             <dl className="space-y-4 font-mono text-[10px] uppercase tracking-[0.18em]">
-              {facts.map((f) => (
+              {t.facts.map((f) => (
                 <motion.div
                   key={f.k}
                   variants={fadeUp}

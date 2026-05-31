@@ -38,7 +38,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sufian Kraitt — Audio Engineer / Filmton / Musikproduktion",
+  title: "Sufian Kraitt · Audio Engineer / Filmton / Musikproduktion",
   description:
     "Audio Engineer für Film, TV und Musikproduktion. Setton, Audiopostproduktion, Mixing, Mastering, Sprachbearbeitung.",
 };

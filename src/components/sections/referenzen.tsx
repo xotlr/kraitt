@@ -9,13 +9,18 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  categories,
-  projects,
-  type Category,
-  type Project,
-} from "@/data/projects";
+import { projects, type Category, type Project } from "@/data/projects";
+import { useLanguage } from "@/lib/language-context";
+import { dict } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+
+/** A project merged with its localized copy for the active language. */
+type LocalizedProject = Project & {
+  role: string;
+  medium: string;
+  description: string;
+  credits: { label: string; value: string }[];
+};
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -63,13 +68,23 @@ const rowVariants: Variants = {
 };
 
 export function Referenzen() {
+  const { lang } = useLanguage();
+  const t = dict(lang).referenzen;
   const [filter, setFilter] = useState<Category | "all">("all");
-  const [active, setActive] = useState<Project | null>(null);
+  const [active, setActive] = useState<LocalizedProject | null>(null);
+
+  // Merge each static project with its copy for the active language.
+  const localized = useMemo<LocalizedProject[]>(
+    () => projects.map((p) => ({ ...p, ...t.projects[p.id] })),
+    [t]
+  );
 
   const visible = useMemo(
     () =>
-      filter === "all" ? projects : projects.filter((p) => p.category === filter),
-    [filter]
+      filter === "all"
+        ? localized
+        : localized.filter((p) => p.category === filter),
+    [filter, localized]
   );
 
   return (
@@ -80,13 +95,11 @@ export function Referenzen() {
       <div className="relative z-10 container-edge">
         <SectionHeading
           index="04"
-          label="Referenzen"
+          label={t.label}
           title={
             <>
-              Eine Auswahl{" "}
-              <span className="font-serif-italic text-ink">
-                dessen, was bleibt.
-              </span>
+              {t.titleA}
+              <span className="font-serif-italic text-ink">{t.titleEm}</span>
             </>
           }
         />
@@ -98,13 +111,14 @@ export function Referenzen() {
           viewport={{ once: true, margin: "-10%" }}
           className="mb-14 flex flex-wrap gap-x-8 gap-y-3 font-mono text-[10px] uppercase tracking-[0.22em]"
         >
-          {categories.map((c) => {
-            const isActive = filter === c.id;
+          {t.categories.map((c) => {
+            const id = c.id as Category | "all";
+            const isActive = filter === id;
             return (
               <motion.button
                 key={c.id}
                 variants={fadeUp}
-                onClick={() => setFilter(c.id)}
+                onClick={() => setFilter(id)}
                 className={cn(
                   "relative pb-1.5 transition-colors duration-500",
                   isActive ? "text-ink" : "text-ink-muted hover:text-ink"
@@ -179,7 +193,7 @@ export function Referenzen() {
                       {p.role}
                     </span>
                     <span className="mt-1 lg:mt-0 block lg:col-span-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
-                      {p.medium.split(" — ")[0]}
+                      {p.medium.split(", ")[0]}
                     </span>
                     <span className="hidden lg:block lg:col-span-1 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint text-right">
                       {p.year}
@@ -208,7 +222,7 @@ export function Referenzen() {
               </div>
               <DialogTitle>{active.title}</DialogTitle>
               <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-muted mt-1 mb-5">
-                {active.role} — {active.medium}
+                {active.role} · {active.medium}
               </div>
               <DialogDescription className="text-base md:text-lg leading-[1.65] font-body">
                 {active.description}
