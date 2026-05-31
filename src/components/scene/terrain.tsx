@@ -48,10 +48,12 @@ const vertexShader = /* glsl */ `
   uniform float uMid;
   uniform float uHigh;
   uniform float uPulse;       // 0->1 radial pulse envelope (beat hits + manual plucks)
+  uniform vec2 uDir;          // auto-conductor heading (unit vec2 on the ground plane; §6)
   varying float vWorldY;
   varying vec3 vWorldPos;
   varying float vCameraDist;
   varying float vHeightNorm;
+  varying vec3 vNormal;       // world-space surface normal (analytic, from the sine sum)
 
   vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
   vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -176,24 +178,50 @@ const vertexShader = /* glsl */ `
     // Wave time multipliers reduced a further ~40% (was already halved
     // once). Even slower ocean now: big swells over ~25 seconds, chop
     // ~10-13 seconds, ripples ~5-7 seconds.
-    float bigSwell =
-      sin(dot(vec2(1.0, 0.2), position.xy) * 0.28 + uTime * 0.24) *
-      (0.14 + audioBass * 1.3);
-    float crossSwell =
-      sin(dot(vec2(0.3, 1.0), position.xy) * 0.34 + uTime * 0.17 + 1.7) *
-      (0.10 + audioBass * 0.85);
-    float chop1 =
-      sin(dot(vec2(0.7, -0.7), position.xy) * 0.9 + uTime * 0.42 + 0.5) *
-      (0.05 + audioMid * 0.9);
-    float chop2 =
-      sin(dot(vec2(-0.5, 0.85), position.xy) * 1.05 + uTime * 0.51 + 3.0) *
-      (0.04 + audioMid * 0.7);
-    float ripple1 =
-      sin(dot(vec2(0.9, 0.4), position.xy) * 2.2 + uTime * 0.87) *
-      (0.025 + audioHigh * 0.35);
-    float ripple2 =
-      sin(dot(vec2(-0.6, 0.8), position.xy) * 2.8 + uTime * 0.99 + 2.2) *
-      (0.02 + audioHigh * 0.25);
+    //
+    // Each wave is sin(dot(D, position.xy) * F + uTime*S + phase) * Amp.
+    // We compute the phase argument ONCE, take sin() for the height and
+    // cos() for the analytic gradient (d/dx = cos(arg) * D.x * F * Amp).
+    // The gradient sum gives the surface normal for the §3 sculpted
+    // light — no dFdx/dFdy and no extra noise; just the six cosines we
+    // already have the arguments for.
+    vec2 dirBig = vec2(1.0, 0.2);   float frqBig = 0.28; float ampBig = (0.14 + audioBass * 1.3);
+    vec2 dirCrs = vec2(0.3, 1.0);   float frqCrs = 0.34; float ampCrs = (0.10 + audioBass * 0.85);
+    vec2 dirCh1 = vec2(0.7, -0.7);  float frqCh1 = 0.9;  float ampCh1 = (0.05 + audioMid * 0.9);
+    vec2 dirCh2 = vec2(-0.5, 0.85); float frqCh2 = 1.05; float ampCh2 = (0.04 + audioMid * 0.7);
+    vec2 dirRp1 = vec2(0.9, 0.4);   float frqRp1 = 2.2;  float ampRp1 = (0.025 + audioHigh * 0.35);
+    vec2 dirRp2 = vec2(-0.6, 0.8);  float frqRp2 = 2.8;  float ampRp2 = (0.02 + audioHigh * 0.25);
+
+    // ---- ANISOTROPIC LEAN (§7.2) ----
+    // Bias each wave's spatial frequency toward the conductor heading: a
+    // wave aligned with uDir keeps its frequency (so its crests pack tight
+    // ALONG the heading), a wave across uDir is stretched (crests spread).
+    // The field "leans" the way the baton points. Crucially we mix from
+    // 1.0 (never below 1-leanAmount) so a wave perpendicular to uDir does
+    // NOT collapse to a flat DC offset — that would pop the whole plane up
+    // as the heading swept past perpendicular. leanAmount stays modest so
+    // the wavefront (§7.1), not the lean, carries most of the gesture.
+    float leanAmount = 0.32;
+    float leanBig = mix(1.0, abs(dot(normalize(dirBig), uDir)), leanAmount);
+    float leanCrs = mix(1.0, abs(dot(normalize(dirCrs), uDir)), leanAmount);
+    float leanCh1 = mix(1.0, abs(dot(normalize(dirCh1), uDir)), leanAmount);
+    float leanCh2 = mix(1.0, abs(dot(normalize(dirCh2), uDir)), leanAmount);
+    float leanRp1 = mix(1.0, abs(dot(normalize(dirRp1), uDir)), leanAmount);
+    float leanRp2 = mix(1.0, abs(dot(normalize(dirRp2), uDir)), leanAmount);
+
+    float argBig = dot(dirBig, position.xy) * frqBig * leanBig + uTime * 0.24;
+    float argCrs = dot(dirCrs, position.xy) * frqCrs * leanCrs + uTime * 0.17 + 1.7;
+    float argCh1 = dot(dirCh1, position.xy) * frqCh1 * leanCh1 + uTime * 0.42 + 0.5;
+    float argCh2 = dot(dirCh2, position.xy) * frqCh2 * leanCh2 + uTime * 0.51 + 3.0;
+    float argRp1 = dot(dirRp1, position.xy) * frqRp1 * leanRp1 + uTime * 0.87;
+    float argRp2 = dot(dirRp2, position.xy) * frqRp2 * leanRp2 + uTime * 0.99 + 2.2;
+
+    float bigSwell  = sin(argBig) * ampBig;
+    float crossSwell = sin(argCrs) * ampCrs;
+    float chop1     = sin(argCh1) * ampCh1;
+    float chop2     = sin(argCh2) * ampCh2;
+    float ripple1   = sin(argRp1) * ampRp1;
+    float ripple2   = sin(argRp2) * ampRp2;
 
     // ---- RADIAL BEAT PULSE ----
     // On a bass hit, a ring expands outward from the origin (the sound
@@ -210,15 +238,67 @@ const vertexShader = /* glsl */ `
       exp(-radius * 0.18) *                              // distance damping
       ringEnv * 1.6;
 
+    // ---- TRAVELING WAVEFRONT (§7.1) ----
+    // A single swell band whose crest sweeps ALONG the conductor heading.
+    // d is the distance of this vertex along uDir; the crest position is
+    // d*frontFreq - frontSpeed*uTime, so as time advances the crest moves
+    // up-heading — and as uDir turns (§6) the whole swell pivots to sweep
+    // the new way. env(d) is a Gaussian centered on the plane so it stays
+    // a BAND travelling through the middle, not a full-plane lift. Energy
+    // is the music's body (bass+mid) so the gesture only swells with the
+    // audio and rests flat when idle — the §6 heading still drifts so it's
+    // never frozen, but the visible swell is audio-gated.
+    float d = dot(uDir, position.xy);
+    float frontEnergy = audioBass * 0.7 + audioMid * 0.5;
+    float frontPhase = d * 0.55 - uTime * 1.6;
+    float wavefront = sin(frontPhase) * exp(-d * d * 0.018) * frontEnergy;
+
+    // Per-layer weights into the summed height. The gradient below MUST
+    // use these same weights so the normal matches the surface we draw.
+    float wBig = 0.85, wCrs = 0.55, wCh1 = 0.18, wCh2 = 0.14, wRp1 = 1.0, wRp2 = 1.0;
+
     // Sum the wave layers.
     float waveSum =
-      bigSwell * 0.85 +
-      crossSwell * 0.55 +
-      chop1 * 0.18 +
-      chop2 * 0.14 +
-      ripple1 +
-      ripple2 +
+      bigSwell * wBig +
+      crossSwell * wCrs +
+      chop1 * wCh1 +
+      chop2 * wCh2 +
+      ripple1 * wRp1 +
+      ripple2 * wRp2 +
+      wavefront * 1.1 +
       radialPulse;
+
+    // ---- ANALYTIC SURFACE NORMAL (§3) ----
+    // Gradient of the height field in local x/y. For each wave term
+    // sin(arg)*amp, d/dx = cos(arg) * dirX * freq * amp (chain rule).
+    // We sum the same six terms with the same weights as the height.
+    // The radial pulse and fbm texture are intentionally omitted: the
+    // pulse is near-zero except mid-beat, and snoise has no cheap
+    // analytic gradient — both contribute < 15% of the slope and would
+    // only cost an extra noise eval. The surface light reads fine
+    // without them.
+    // (frequency factors include the §7.2 lean so the normal matches the
+    // leaned surface — lean is constant in x/y so it passes through the
+    // chain rule as a plain multiplier.)
+    float dHdx =
+      cos(argBig) * dirBig.x * frqBig * leanBig * ampBig * wBig +
+      cos(argCrs) * dirCrs.x * frqCrs * leanCrs * ampCrs * wCrs +
+      cos(argCh1) * dirCh1.x * frqCh1 * leanCh1 * ampCh1 * wCh1 +
+      cos(argCh2) * dirCh2.x * frqCh2 * leanCh2 * ampCh2 * wCh2 +
+      cos(argRp1) * dirRp1.x * frqRp1 * leanRp1 * ampRp1 * wRp1 +
+      cos(argRp2) * dirRp2.x * frqRp2 * leanRp2 * ampRp2 * wRp2;
+    float dHdy =
+      cos(argBig) * dirBig.y * frqBig * leanBig * ampBig * wBig +
+      cos(argCrs) * dirCrs.y * frqCrs * leanCrs * ampCrs * wCrs +
+      cos(argCh1) * dirCh1.y * frqCh1 * leanCh1 * ampCh1 * wCh1 +
+      cos(argCh2) * dirCh2.y * frqCh2 * leanCh2 * ampCh2 * wCh2 +
+      cos(argRp1) * dirRp1.y * frqRp1 * leanRp1 * ampRp1 * wRp1 +
+      cos(argRp2) * dirRp2.y * frqRp2 * leanRp2 * ampRp2 * wRp2;
+    // Local-space normal: surface is z = H(x,y), so the (unnormalized)
+    // normal is (-dHdx, -dHdy, 1). normalMatrix carries it to world
+    // space (mesh has uniform scale, so this is exact).
+    vec3 localNormal = normalize(vec3(-dHdx, -dHdy, 1.0));
+    vNormal = normalize(normalMatrix * localNormal);
 
     // Water texture — soft broad FBM noise on top of the sines.
     float texture = fbm(position.xy * 0.35, uTime * 0.13) * 0.06;
@@ -249,10 +329,12 @@ const fragmentShader = /* glsl */ `
   varying vec3 vWorldPos;
   varying float vCameraDist;
   varying float vHeightNorm;
+  varying vec3 vNormal;
   uniform float uBass;
   uniform float uHigh;
   uniform vec3 uColor;
   uniform float uTheme;   // 0 = dark, 1 = light (eased in JS)
+  uniform vec3 uFogColor; // horizon haze tint — matches the atmosphere bed so terrain dissolves into it (§2)
 
   void main() {
     // Contour spacing. Bass tightens spacing dramatically — lines
@@ -266,11 +348,22 @@ const fragmentShader = /* glsl */ `
     float ratio = vWorldY / spacing;
     float distNorm = abs(fract(ratio) - 0.5);
 
-    // Atmospheric depth fade. Visible band widened to 2.5..12.0 wu so
-    // more of the plane reads as live signal (the old 3..9 band dissolved
-    // most of the terrain into black, leaving only a few corner contours).
-    // The far edge still fades fully to OLED black for atmospheric depth.
-    float depthFade = smoothstep(12.0, 2.5, vCameraDist);
+    // ---- ATMOSPHERIC DEPTH (§2) ----
+    // Two-part falloff instead of one flat smoothstep band:
+    //   1. nearFade — a soft ramp that just trims the very foreground so
+    //      the closest lip doesn't over-bloom; full strength by ~3.5wu.
+    //   2. haze — an EXPONENTIAL extinction toward the far plane, so the
+    //      land doesn't end at a hard cutoff but DISSOLVES into a defined
+    //      horizon (the "emerging from haze" read). exp(-d*k) never quite
+    //      reaches 0, so distant ridges leave a faint glow in the mist
+    //      rather than snapping to black.
+    // depthFade is the line/surface coverage multiplier (keeps the old
+    // name so the contour + fill math below is unchanged); hazeAmt is the
+    // 0..1 "how much fog" used later to blend the colour toward uFogColor.
+    float nearFade = smoothstep(1.5, 3.5, vCameraDist);
+    float haze = exp(-max(vCameraDist - 3.5, 0.0) * 0.34);   // 1 near, ~0.1 by ~10wu
+    float hazeAmt = 1.0 - haze;
+    float depthFade = nearFade * haze;
 
     // Pixel-stable line width via screen-space derivatives. Near lines
     // crisp, far lines softer.
@@ -296,34 +389,78 @@ const fragmentShader = /* glsl */ `
     float rightMask = mix(0.25, 1.0, smoothstep(-2.5, 2.5, vWorldPos.x));
     line *= rightMask;
 
-    // ---- SURFACE FILL ----
-    // The mesh between contour lines also draws now — a faint
-    // height-based gradient that gives the terrain a "3D mesh gradient"
-    // look. Peaks slightly brighter than valleys, far slopes fade to
-    // black via depthFade. This is what makes the 3D form readable
-    // instead of just floating contour outlines on void.
-    float surfaceShade = vHeightNorm * 0.26 + 0.03;  // 0.03 in valleys, 0.29 at peaks
+    // ---- SURFACE FILL + SCULPTED LIGHT (§3) ----
+    // The mesh between contour lines draws as a faint fill. Base term is
+    // still height (peaks brighter than valleys) so the form reads even
+    // on flats; on TOP we add a low, cold KEY light off the analytic
+    // normal so ridges that FACE the light lift and faces turned away
+    // fall to black. That's what turns the gradient into sculpted land.
+    float surfaceShade = vHeightNorm * 0.20 + 0.03;  // base height fill (slightly lower so the light has headroom)
+
+    // Low cold key: from the left, just above the horizon. Diffuse only;
+    // no specular (this is matte land, not water-sheen). The light is a
+    // dark-mode device — paper mode wants clean fill, so we gate it out.
+    vec3 keyDir = normalize(vec3(-0.55, 0.40, 0.35));
+    float key = max(dot(normalize(vNormal), keyDir), 0.0);
+    // Gate the key to the high parts of the surface (vHeightNorm) so it
+    // sculpts RIDGES rather than lifting the whole field — and clamp it,
+    // so only genuine lit crests can approach the bloom threshold while
+    // the inter-line fill stays well below it (guards the OLED bed).
+    float ridgeLight = key * smoothstep(0.45, 0.95, vHeightNorm);
+    surfaceShade += ridgeLight * 0.16 * (1.0 - uTheme);   // dark-mode sculpt only
     surfaceShade *= depthFade;
     surfaceShade *= rightMask;
     // Surface fill between the lines. Dark mode: a faint cool tint that
-    // makes the 3D form readable on black. Light mode: we DROP this almost
+    // makes the 3D form readable on black, lifted toward a colder blue on
+    // lit ridges (the key's colour). Light mode: we DROP this almost
     // entirely so clean paper shows between the lines — a grey fill there
     // just washes the contrast out and buries the lines. Fade it to ~0 as
     // uTheme→1.
-    vec3 surfaceTint = vec3(0.14, 0.17, 0.23);   // the fill COLOUR (not premult)
+    vec3 surfaceBase = vec3(0.14, 0.17, 0.23);   // ambient fill colour
+    vec3 surfaceLit  = vec3(0.30, 0.40, 0.52);   // cold-blue lift where the key catches a ridge
+    vec3 surfaceTint = mix(surfaceBase, surfaceLit, clamp(ridgeLight, 0.0, 1.0) * (1.0 - uTheme));
     float surfaceAlpha = surfaceShade * (1.0 - uTheme * 0.92);
 
     // ---- LINE COLOR ----
-    // Dark mode: cold white-blue, warming to gold only on loud beats.
-    // Light mode: a warm near-black ink so the contours read as drawn
-    // lines on paper; gold beat-tint still applies.
+    // Dark mode: cold white-blue. On a beat, the site's ONE accent —
+    // amber #b8845c — bleeds into the HIGH PARTS OF THE CREST only, so a
+    // hit sends amber glow rippling along the ridgelines (the landscape
+    // itself reacting) rather than warming every line into a flat wash.
+    // That's both the DS "luminous terrain" note and the on-brand accent
+    // rule (amber = shader peaks) in one move (§4). Light mode keeps its
+    // restrained drawn-ink behaviour with a faint warm beat-tint.
     vec3 cool = vec3(0.889, 0.894, 0.902);   // #e3e4e6 — near-neutral, faintest cool
-    vec3 gold = vec3(0.600, 0.560, 0.510);   // #998f82 — desaturated warm grey
+    vec3 amber = vec3(0.722, 0.518, 0.361);  // #b8845c — the sanctioned warm accent (shader peaks)
+    vec3 warmGrey = vec3(0.600, 0.560, 0.510); // #998f82 — desaturated, for the paper bed
     vec3 inkLine = vec3(0.07, 0.065, 0.058); // near-black neutral ink for light
-    float goldMix = smoothstep(0.5, 0.8, uBass);
-    vec3 darkLine = mix(cool, gold, goldMix);
-    vec3 lightLine = mix(inkLine, gold, goldMix * 0.7);
+
+    // Amber gate (dark mode): a loud beat × a high crest. Both factors are
+    // 0..1, so amber only appears where a tall ridge coincides with a hit
+    // and fades back to cool as either subsides — it RIPPLES along the
+    // crests as the waves move, instead of tinting the whole field. The
+    // crest gate opens from 0.48 so the amber catches the upper SHOULDERS
+    // of ridges (reads as a glow running along the ridgeline) not just the
+    // single tallest pixels; capped below 1.0 so the brightest crests keep
+    // a cool core and the amber stays an accent, never a flat wash.
+    float beat = smoothstep(0.32, 0.7, uBass);
+    float crest = smoothstep(0.48, 0.92, vHeightNorm);
+    float amberMix = beat * crest * 0.85;
+    vec3 darkLine = mix(cool, amber, amberMix);
+
+    // Light mode: keep the prior subtle warm-grey beat tint (global, faint).
+    float warmMix = smoothstep(0.5, 0.8, uBass);
+    vec3 lightLine = mix(inkLine, warmGrey, warmMix * 0.7);
     vec3 lineColor = mix(darkLine, lightLine, uTheme);
+
+    // ---- HORIZON LUMINANCE GRADIENT (§1) ----
+    // The single highest-impact DS move: contours toward the horizon glow
+    // BRIGHTER than the calm foreground, so the land reads as "emerging
+    // luminous from haze" rather than as flat lines on flat black. Drive
+    // off camera distance — a smooth lift that peaks in the mid-distance
+    // band, just before §2's haze swallows the far ridges. Dark mode only;
+    // on paper the ink should stay an even weight, not glow.
+    float horizonGlow = mix(1.0, 1.85, smoothstep(3.0, 9.0, vCameraDist));
+    lineColor *= mix(horizonGlow, 1.0, uTheme);
 
     // Line alpha. Dark mode lifted to 1.35× so the contours are clearly
     // the brightest thing on the OLED-black bed (the instrument reads as a
@@ -343,6 +480,13 @@ const fragmentShader = /* glsl */ `
     // Both surfaceTint and lineColor are plain (un-premultiplied) colours;
     // pick line where it covers, surface tint elsewhere.
     vec3 finalColor = mix(surfaceTint, lineColor, lineFrac);
+
+    // §2 — pull the colour toward the horizon haze tint with distance, so
+    // far terrain meets the background seamlessly (a defined horizon)
+    // rather than floating as dimmed lines on the bed. uFogColor matches
+    // the atmosphere's bed colour (OLED black in dark, paper in light), so
+    // terrain and background converge to the same value at the far plane.
+    finalColor = mix(finalColor, uFogColor, hazeAmt);
 
     if (finalAlpha < 0.005) discard;
     gl_FragColor = vec4(finalColor, finalAlpha);
@@ -376,6 +520,12 @@ export function Terrain() {
       uPulse: { value: 0 },
       uTheme: { value: 0 },
       uColor: { value: new THREE.Color("#b8845c") },
+      // Horizon haze tint (§2). Lerped per-theme in useFrame to match the
+      // atmosphere bed so terrain dissolves into the background, not black.
+      uFogColor: { value: new THREE.Color(0, 0, 0) },
+      // Auto-conductor heading (§6) — a unit vec2 swept by an LFO in
+      // useFrame. Starts pointing along +x.
+      uDir: { value: new THREE.Vector2(1, 0) },
     };
     return { geometry: geo, uniforms: u };
   }, []);
@@ -411,6 +561,15 @@ export function Terrain() {
   const ampMid = useRef(0);
   const ampHigh = useRef(0);
 
+  // ---- AUTO-CONDUCTOR STATE (§6) ----
+  // The baton. `phase` is accumulated by rate*delta each frame (NOT
+  // t*rate, so a change in rate bends the sweep smoothly instead of
+  // jumping it). `dir` is the eased heading the shader reads; we lerp it
+  // toward the LFO target and renormalize so dot(uDir, pos) stays a true
+  // projected distance even mid-turn.
+  const condPhase = useRef(0);
+  const condDir = useRef(new THREE.Vector2(1, 0));
+
   // Last pulse counter we acted on. The console buttons increment
   // levels.current.pulse via triggerPulse(); when this lags that, fire a
   // manual ripple (see useFrame). Lets a click "pluck" the surface when
@@ -440,7 +599,7 @@ export function Terrain() {
     };
   }, [viewportRef]);
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     scrollSmoothed.current +=
       (scrollTarget.current - scrollSmoothed.current) * 0.1;
 
@@ -455,6 +614,13 @@ export function Terrain() {
     const themeTarget = theme === "light" ? 1 : 0;
     themeMix.current += (themeTarget - themeMix.current) * 0.08;
     u.uTheme.value = themeMix.current;
+
+    // Horizon haze tint follows the eased theme between the atmosphere's
+    // dark bed (#000) and its paper bed (#f2f1ef ≈ 0.949,0.945,0.937), so
+    // far terrain dissolves into whatever the background actually is.
+    const fog = u.uFogColor.value;
+    const m = themeMix.current;
+    fog.setRGB(0.949 * m, 0.945 * m, 0.937 * m);
 
     // Ease the band amplitudes toward the live levels. Asymmetric and
     // attack-heavy: the wave reacts fast on the way UP (so it tracks the
@@ -472,6 +638,39 @@ export function Terrain() {
     u.uBass.value = ampBass.current;
     u.uMid.value = ampMid.current;
     u.uHigh.value = ampHigh.current;
+
+    // ---- AUTO-CONDUCTOR LFO (§6) ----
+    // The baton sweeps the heading left<->right on its own, so the scene
+    // always looks conducted even at idle; the SWEEP RATE rises with the
+    // eased mid level, so a busy passage visibly cues faster and a calm
+    // one drifts slow. We accumulate phase by rate*delta (frame-rate
+    // independent, and continuous when rate changes), then:
+    //   angle = swing*sin(phase) + a slow off-ratio 2nd harmonic so the
+    //           gesture never feels metronomic.
+    //   dir   = (cos angle, sin angle), eased toward + renormalized so it
+    //           turns smoothly and never snaps or de-normalizes.
+    // dt is clamped so a long stall (backgrounded tab resuming) can't
+    // fling the phase forward in one step.
+    const dt = Math.min(delta, 0.05);
+    const BASE_RATE = 0.22;          // idle sweep speed (rad/s of phase)
+    const RATE_GAIN = 1.1;           // how much mid energy speeds the baton
+    const MAX_RATE = 1.4;            // clamp so loud passages never strobe
+    const SWING = 1.05;              // ±60° — gestures left<->right, never spins
+    const rate = Math.min(BASE_RATE + ampMid.current * RATE_GAIN, MAX_RATE);
+    condPhase.current += rate * dt;
+    const angle =
+      SWING * Math.sin(condPhase.current) +
+      SWING * 0.3 * Math.sin(condPhase.current * 0.37 + 1.1);
+    const tx = Math.cos(angle);
+    const ty = Math.sin(angle);
+    // Ease toward the target heading (smooth turn), then renormalize.
+    const dir = condDir.current;
+    dir.x += (tx - dir.x) * 0.06;
+    dir.y += (ty - dir.y) * 0.06;
+    const len = Math.hypot(dir.x, dir.y) || 1;
+    dir.x /= len;
+    dir.y /= len;
+    (u.uDir.value as THREE.Vector2).set(dir.x, dir.y);
 
     // ---- RADIAL PULSE TRIGGER ----
     // Two ways to launch the expanding ring:

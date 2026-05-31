@@ -105,16 +105,18 @@ export function Scene() {
               so subsequent passes operate on a clean image. */}
           <SMAA />
 
-          {/* Bloom — selective. Threshold raised HIGH so only the bright
-              contour crests bloom; the dim surface fill (≈0.02–0.20) must
-              stay below it, otherwise bloom smears the whole field into a
-              grey haze — the exact thing that was greying out the OLED bed.
-              threshold 0.18 -> 0.32, intensity 0.8 -> 0.7. Lines bloom,
-              the bed does not. */}
+          {/* Bloom — selective. Threshold keeps the dim surface fill
+              (≈0.02–0.23 luminance) and the cold-blue ridge lift BELOW it,
+              so only the bright contour crests bloom — bloom the lines, not
+              the bed (the OLED black must stay #000). Retuned for the DS
+              luminosity pass (§1): now that the contours carry a horizon
+              glow, threshold 0.32 -> 0.28 lets the brighter far ridgelines
+              bloom into the haze, intensity 0.7 -> 0.9 makes them genuinely
+              glow out of near-black. Guard verified against idle + peaks. */}
           <Bloom
-            intensity={0.7}
+            intensity={0.9}
             kernelSize={KernelSize.LARGE}
-            luminanceThreshold={0.32}
+            luminanceThreshold={0.28}
             luminanceSmoothing={0.25}
             mipmapBlur
             blendFunction={BlendFunction.SCREEN}

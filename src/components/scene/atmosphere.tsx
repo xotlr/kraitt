@@ -137,6 +137,19 @@ const fragmentShader = /* glsl */ `
     float pocketBoost = 1.0 + uBass * 0.6;
     vec3 col = mix(bg, pocketColor * pocketBoost, pocket);
 
+    // ---- GROUND-FOG HAZE BAND (§5) ----
+    // The terrain emerges from a defined horizon; give it something to sit
+    // IN by lifting the lower third of the bed by a hair of cold near-
+    // black. vUv.y is 0 at the bottom; the band ramps in below ~0.45 and
+    // is strongest at the very bottom. Kept tiny — a few thousandths — so the
+    // bed still reads as OLED black, just no longer a dead flat void. The
+    // FBM noise (n) breaks the band up so it drifts like real haze rather
+    // than a clean gradient. Dark mode only; paper needs no fog.
+    float fogBand = smoothstep(0.45, 0.0, vUv.y);          // 0 above mid, 1 at floor
+    float fogBreakup = 0.7 + 0.3 * (n * 0.5 + 0.5);        // soft noise modulation
+    vec3 groundFog = vec3(0.018, 0.022, 0.030);            // cold near-black lift
+    col += groundFog * fogBand * fogBreakup * (1.0 - uTheme);
+
     // Film grain. Amplitude raised (0.012 -> 0.028) so the texture
     // actually reads. The catch on a pure-black bed: grain is ±half its
     // amplitude, but the final max(col, 0.0) clamps the negative half to
