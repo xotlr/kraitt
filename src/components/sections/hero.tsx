@@ -58,7 +58,7 @@ export function Hero() {
           // wordmark solid and on the mono grid, not hairline. Inherits
           // .font-display's weight + tracking now, so no per-element override.
           // .wordmark-fringe adds the audio-reactive red/cyan chromatic split.
-          className="wordmark-fringe font-display text-display leading-[var(--text-display--line-height)] text-balance text-legible text-ink"
+          className="wordmark-fringe font-display text-display leading-[0.82] text-balance text-legible text-ink"
         >
           <span className="block" aria-hidden>
             Sufian
