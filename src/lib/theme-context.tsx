@@ -32,17 +32,32 @@ interface ThemeState {
 const ThemeContext = createContext<ThemeState | null>(null);
 const STORAGE_KEY = "sk-theme";
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark");
-
-  useEffect(() => {
+function readStoredTheme(): Theme {
+  // Client-only initializer (mirrors language-context). The layout's no-flash
+  // script already applies the `light` CLASS pre-paint; reading the stored
+  // value here means the React `theme` state — which the shader subscribes to
+  // for its background/contour colours — also starts correct, so the scene
+  // doesn't morph dark→light after hydration for a returning light-mode user.
+  if (typeof window === "undefined") return "dark";
+  try {
     const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (saved === "dark" || saved === "light") setThemeState(saved);
-  }, []);
+    if (saved === "dark" || saved === "light") return saved;
+  } catch {
+    // localStorage unavailable — fall through to the dark default.
+  }
+  return "dark";
+}
+
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [theme, setThemeState] = useState<Theme>(readStoredTheme);
 
   useEffect(() => {
     document.documentElement.classList.toggle("light", theme === "light");
-    window.localStorage.setItem(STORAGE_KEY, theme);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, theme);
+    } catch {
+      // ignore storage failures
+    }
   }, [theme]);
 
   const setTheme = useCallback((t: Theme) => setThemeState(t), []);

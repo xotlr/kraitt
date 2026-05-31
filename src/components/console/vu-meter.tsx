@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useAudio, useAudioLevels } from "@/lib/audio";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 /**
  * VuMeter — a dry, modular needle meter. NOT a cream vintage VU: it's cut from
@@ -29,14 +30,11 @@ export function VuMeter() {
   const levels = useAudioLevels();
   const { musicOn, micOn } = useAudio();
   const active = musicOn || micOn;
+  const reduce = useReducedMotion();
   const needleRef = useRef<SVGGElement>(null);
   const needleLineRef = useRef<SVGLineElement>(null);
 
   useEffect(() => {
-    const reduce = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
-
     const park = () => {
       if (needleRef.current) {
         // SVG transform attribute, pivoting natively around (50,50) — see note
@@ -80,7 +78,7 @@ export function VuMeter() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [levels, active]);
+  }, [levels, active, reduce]);
 
   return (
     <div

@@ -12,7 +12,7 @@ import { SECTIONS } from "@/components/console/controls";
 import { LanguageToggle } from "@/components/console/language-toggle";
 import { StudioButton } from "@/components/console/studio-button";
 import { ThemeToggle } from "@/components/console/theme-toggle";
-import { useActiveSection } from "@/components/console/use-active-section";
+import { useSectionNav } from "@/components/console/use-active-section";
 import { useAudio } from "@/lib/audio";
 import { useScrollTo } from "@/lib/scroll-context";
 import { useLanguage } from "@/lib/language-context";
@@ -40,21 +40,13 @@ const item: Variants = {
 };
 
 export function KnobRail() {
-  const active = useActiveSection();
+  const { active, handleSection } = useSectionNav();
   const scrollTo = useScrollTo();
   const { lang } = useLanguage();
   const c = dict(lang).console;
   const nav = dict(lang).nav;
-  const { musicOn, micOn, musicStatus, muted, toggleMute, toggleMusic, toggleMic, triggerPulse } =
+  const { musicOn, micOn, musicStatus, muted, toggleMute, toggleMusic, toggleMic } =
     useAudio();
-  const audioOff = !musicOn && !micOn;
-
-  const handleSection =
-    (id: string): React.MouseEventHandler<HTMLButtonElement> =>
-    (e) => {
-      if (audioOff) triggerPulse();
-      scrollTo(id)(e);
-    };
 
   return (
     <motion.div

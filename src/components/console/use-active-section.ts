@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { SECTIONS } from "@/components/console/controls";
-import { useScrollViewport } from "@/lib/scroll-context";
+import { useAudio } from "@/lib/audio";
+import { useScrollViewport, useScrollTo } from "@/lib/scroll-context";
 
 /**
  * useActiveSection — tracks which section is in view, observed against
@@ -19,30 +20,51 @@ export function useActiveSection(): string {
   const viewportRef = useScrollViewport();
 
   useEffect(() => {
-    let cleanup: (() => void) | null = null;
-    const id = requestAnimationFrame(() => {
-      const root = viewportRef.current;
-      if (!root) return;
-      const observers: IntersectionObserver[] = [];
-      SECTIONS.forEach((s) => {
-        const el = document.getElementById(s.id);
-        if (!el) return;
-        const obs = new IntersectionObserver(
-          ([entry]) => {
-            if (entry.isIntersecting) setActive(s.id);
-          },
-          { root, rootMargin: "-40% 0px -55% 0px", threshold: 0 }
-        );
-        obs.observe(el);
-        observers.push(obs);
-      });
-      cleanup = () => observers.forEach((o) => o.disconnect());
+    const root = viewportRef.current;
+    if (!root) return;
+    // No rAF: IntersectionObserver already defers its first callback, and
+    // the section elements exist by the time this effect runs. Observing
+    // synchronously means the disconnect below always tears every observer
+    // down, even on a same-tick unmount.
+    const observers = SECTIONS.map((s) => {
+      const el = document.getElementById(s.id);
+      if (!el) return null;
+      const obs = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) setActive(s.id);
+        },
+        { root, rootMargin: "-40% 0px -55% 0px", threshold: 0 }
+      );
+      obs.observe(el);
+      return obs;
     });
-    return () => {
-      cancelAnimationFrame(id);
-      cleanup?.();
-    };
+    return () => observers.forEach((o) => o?.disconnect());
   }, [viewportRef]);
 
   return active;
+}
+
+/**
+ * useSectionNav — the shared nav behaviour for the desktop rail AND the mobile
+ * panel: the active-section value plus a click handler that scrolls to a
+ * section and, when no audio source is playing, fires a manual wave pulse so a
+ * section press visibly drives the signal in silence. Both consoles used to
+ * inline an identical `handleSection` closure; this is the single source.
+ */
+export function useSectionNav() {
+  const active = useActiveSection();
+  const scrollTo = useScrollTo();
+  const { musicOn, micOn, triggerPulse } = useAudio();
+  const audioOff = !musicOn && !micOn;
+
+  const handleSection = useCallback(
+    (id: string): React.MouseEventHandler<HTMLButtonElement> =>
+      (e) => {
+        if (audioOff) triggerPulse();
+        scrollTo(id)(e);
+      },
+    [audioOff, triggerPulse, scrollTo]
+  );
+
+  return { active, handleSection };
 }

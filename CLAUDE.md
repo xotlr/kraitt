@@ -38,26 +38,29 @@ post-processing stack. The scene is the brand.
 The scene is the most expensive thing on the page. Current status
 (`src/components/scene/index.tsx`, `src/hooks/use-device-capability.ts`):
 
-- **[NOT YET ENFORCED] Frame-cap to 30fps desktop / 20fps mobile.** Scene
-  runs `frameloop="always"` (~60fps). Still owed — do not treat as done.
-- **[NOT YET ENFORCED] Pause when the tab is hidden.** No
-  `visibilitychange`/`document.hidden` handling; r3f keeps rendering in a
-  backgrounded tab. Should be added.
+- **[DONE] Frame-cap to 30fps desktop / 20fps mobile.** Canvas runs
+  `frameloop="demand"`; `FrameCap` (`scene/frame-cap.tsx`) is the sole
+  `invalidate()` pump, on a self-correcting timer at 30 (desktop) / 20
+  (mobile). Fixed-coefficient eases settle proportionally slower at the cap —
+  an accepted trade.
+- **[DONE] Pause when the tab is hidden.** `visibilitychange` flips
+  `FrameCap` to `fps=null` (no pump → holds last frame); restores on return.
 - **[DONE] Skip on low-end devices** (`deviceMemory <= 1` or
   `hardwareConcurrency <= 1` → tier `low` → `Scene` returns null).
-- **[PARTIAL] `prefers-reduced-motion`** sets `frameloop="demand"` — a
-  static frame, not a hard one-frame stop.
+- **[DONE] `prefers-reduced-motion`** → `FrameCap` `fps=null`: no pump runs,
+  the scene holds a static frame.
 - **[DONE] DPR capped at 1 below 1024px** (`[1, 1.5]` above, `1` below).
 
-These gates survive any rewrite. The NOT-YET-ENFORCED ones are debt, not
-deletions — implement them, don't silently drop them. Removing any gate
-needs an explicit justification.
+These gates survive any rewrite. All five are now enforced; removing any
+gate needs an explicit justification.
 
 ## Where logic lives
 
 - `src/components/scene/*.tsx` — the r3f scene and only the scene
   (`index.tsx` composes; `atmosphere.tsx`, `terrain.tsx`,
-  `camera-rig.tsx` are its parts). No business logic, no content.
+  `camera-rig.tsx` are its parts; `frame-cap.tsx` throttles the loop;
+  `glsl-noise.ts` is the shared simplex shared by the two shaders). No
+  business logic, no content.
 - `src/components/island.tsx` — monitor-bezel frame containing the scene;
   `src/components/console/*` — desk chrome (rails, studio buttons, level
   meter, theme/language/audio toggles). Section nav lives here, not in a

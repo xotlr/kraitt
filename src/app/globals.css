@@ -40,6 +40,15 @@
      cold palette as the strands. */
   --color-string: #e3e0da;
 
+  /* The ONE accent colour: warm amber/gold. Per the design rule, the Fraunces
+     italic accents (and shader peaks) are the only place colour appears. This
+     is the gold peak of the intensity ramp (lib/utils INTENSITY_RAMP), so the
+     resting accent and the audio-driven tint share one colour identity: at
+     rest the italics sit at this amber; when audio plays --audio-tint rides
+     the ramp from cold blue up to this same gold. Without this they fell back
+     to plain ink and the warm accent vanished on a silent page. */
+  --color-accent: #c2a578;
+
   /* ── Console graphite ladder ──────────────────────────────────────────
      The scene matte stays OLED-black; the CONSOLE chrome does not. A real
      desk reads as gear because it has a value structure under one raking
@@ -63,7 +72,6 @@
   --console-print: #74757a;
 
   --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
-  --font-serif: var(--font-serif), ui-serif, Georgia, serif;
   --font-mono: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
 
   /* Type scale — tightened. Display is large but not overpowering.
@@ -107,7 +115,6 @@
 :root {
   --container-max: 1280px;
   --space-section: clamp(7rem, 4rem + 12vw, 14rem);
-  --space-section-sm: clamp(4rem, 2.5rem + 6vw, 8rem);
   --gutter: clamp(1.5rem, 1rem + 2vw, 4rem);
 
   /* ── Console sizing (modular) ──
@@ -181,17 +188,17 @@ html.light {
 @property --color-ink {
   syntax: "<color>";
   inherits: true;
-  initial-value: #ece8df;
+  initial-value: #f5f2eb;
 }
 @property --color-ink-muted {
   syntax: "<color>";
   inherits: true;
-  initial-value: #8a857c;
+  initial-value: #9d988e;
 }
 @property --color-ink-faint {
   syntax: "<color>";
   inherits: true;
-  initial-value: #4a4640;
+  initial-value: #565249;
 }
 @property --color-hairline {
   syntax: "<color>";
@@ -207,9 +214,6 @@ html.light {
 @layer base {
   :root {
     color-scheme: dark;
-    /* Readability-gradient tint (see .island-readability). Black bed in
-       dark mode. */
-    --readability-rgb: 0 0 0;
     --transition-theme: 450ms cubic-bezier(0.22, 1, 0.36, 1);
     transition:
       --color-canvas var(--transition-theme),
@@ -228,9 +232,6 @@ html.light {
      shader's gold contour darkens via JS) carries across both modes. */
   html.light {
     color-scheme: light;
-    /* Paper bed → the readability fade lightens (not darkens) the type
-       column in light mode. */
-    --readability-rgb: 243 242 240;
     --color-canvas: #f3f2f0;
     /* Chassis a touch deeper than the paper canvas so the bezel reads as a
        framing surface around the screen, like the warm-grey body of a desk. */
@@ -241,6 +242,10 @@ html.light {
     --color-ink-faint: #aeaaa3;
     --color-hairline: #d8d6d0;
     --color-hairline-hover: #c2bfb7;
+    /* Amber accent, deepened for the parchment bg — the light #c2a578 gold
+       washes out on warm paper, so the resting italic accent uses a richer,
+       darker amber to hold contrast and stay legible. */
+    --color-accent: #9a7842;
 
     /* Console in light mode → brushed-aluminium desk. Same value LOGIC as
        dark (caps proud and a touch lighter than the panel, recesses darker,
@@ -268,8 +273,8 @@ html.light {
   html,
   body {
     color: var(--color-ink);
-    /* Geist sans is the system. Fraunces is loaded but only used via
-       .font-serif-italic for rare italic accents. */
+    /* ONE typeface: Geist sans, system-wide. Emphasis is italic + the amber
+       accent colour, not a second family. */
     font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
     font-weight: var(--weight-body);
     font-feature-settings: "kern", "ss01", "ss03";
@@ -318,16 +323,41 @@ html.light {
     font-weight: var(--weight-body);
     letter-spacing: -0.003em;
   }
-  /* The ONE warm-serif accent: Fraunces italic, used inside body copy
-     for emphasis. Lower opsz than the old display call so it sits at
-     body size without looking display-y. Fraunces is a variable font, so
-     its weight is free (not limited to Geist's discrete cuts). */
-  .font-serif-italic {
-    font-family: var(--font-serif), ui-serif, Georgia, serif;
+  /* Emphasis accent — ONE typeface site (Geist only, no serif). Emphasis is
+     carried by italic + the amber accent COLOUR (via .audio-accent), not by a
+     second typeface. */
+  .text-accent {
+    font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
     font-style: italic;
     font-weight: var(--weight-body-emphasis);
-    font-variation-settings: "opsz" 24, "SOFT" 50, "WONK" 0;
     letter-spacing: -0.005em;
+  }
+
+  /* Audio-reactive accent — the Fraunces italic words, the ONE warm element.
+     At rest they sit at --color-accent (amber), so the accent identity is
+     always present on a silent page (previously they fell back to --color-ink
+     and were indistinguishable from body text — just italic — which read as an
+     accidental font switch). When audio plays, --audio-tint overrides toward
+     the live intensity ramp (cold blue → up to the same gold), and the bloom
+     rises off --audio-glow. The vars are written by useAudioGlow onto the
+     nearest heading/prose ancestor and INHERIT down to this span. Short
+     transitions ease the colour/glow with the beat. */
+  .audio-accent {
+    color: var(--audio-tint, var(--color-accent));
+    text-shadow:
+      0 0 calc(1px + var(--audio-glow, 0) * 5px)
+        color-mix(
+          in srgb,
+          var(--audio-tint, transparent) calc(var(--audio-glow, 0) * 65%),
+          transparent
+        ),
+      0 0 calc(6px + var(--audio-glow, 0) * 20px)
+        color-mix(
+          in srgb,
+          var(--audio-tint, transparent) calc(var(--audio-glow, 0) * 40%),
+          transparent
+        );
+    transition: text-shadow 90ms linear, color 90ms linear;
   }
   .font-mono {
     font-family: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
@@ -389,32 +419,33 @@ html.light {
      per-frame cost on top of the r3f scene. */
   .console-chassis {
     background-color: var(--color-bezel);
-    background-image:
-      /* Isotropic fractal grain — high-frequency monochrome turbulence,
-         tiled at 160px, sitting at low opacity so it reads as fine surface
-         tooth rather than visible noise. baseFrequency is high (fine grain)
-         and stitchTiles makes the 160px tile seamless. */
-      var(--chassis-grain),
-      /* gentle top→bottom key light across the whole field */
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, white 3%, var(--color-bezel)) 0%,
-        var(--color-bezel) 40%,
-        color-mix(in srgb, black 14%, var(--color-bezel)) 100%
-      );
-    background-size:
-      160px 160px,
-      100% 100%;
-    background-repeat: repeat, no-repeat;
+    /* Dark mode: a FLAT near-black gutter. The old top→bottom gradient lifted
+       the top toward white (white 3%), which on the near-black bezel read as a
+       visible GREY band — not the pure-black matte we want. Dropped the white
+       lift; the dark chassis is now just --color-bezel (#090909) with a hair
+       of extra darkening toward the bottom so it doesn't read as a dead flat
+       fill. The page-wide GrainOverlay supplies the surface tooth.
+       (Light mode overrides background-image entirely below, so this only
+       affects dark.) */
+    background-image: linear-gradient(
+      180deg,
+      var(--color-bezel) 0%,
+      var(--color-bezel) 55%,
+      color-mix(in srgb, black 60%, var(--color-bezel)) 100%
+    );
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
   }
 
-  /* The grain itself, factored into a token so light mode can dial its
-     strength independently (a paper/wood field wants less grain than a
-     near-black one before it reads as dirt). Dark theme: ~4% opacity white
-     noise. The fractalNoise turbulence is rendered to alpha then flattened
-     to a soft grey so it tints both up and down off the bezel tone. */
-  :root {
-    --chassis-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  /* Content readability scrim — a soft full-screen darkening between the scene
+     and the scroll content so editorial type reads cleanly over the terrain.
+     Gentle (no edges, no box). Dark theme only; the parchment light theme needs
+     no scrim, so it's cleared there. Tunable in one place. */
+  .content-scrim {
+    background-color: rgba(0, 0, 0, 0.22);
+  }
+  html.light .content-scrim {
+    background-color: transparent;
   }
 
   /* Light mode: flat warm-parchment frame (no texture). */

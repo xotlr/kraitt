@@ -1,6 +1,7 @@
 "use client";
 
 import { useAudioGlow } from "@/hooks/use-audio-glow";
+import { GrainOverlay } from "@/components/grain-overlay";
 
 /**
  * Island — the monitor bezel.
@@ -39,11 +40,26 @@ export function Island({ children }: { children: React.ReactNode }) {
     <div className="flex-1 min-w-0 h-full py-2 sm:py-2.5 md:py-3">
       <div className="relative h-full w-full">
         <div className="relative h-full w-full overflow-hidden rounded-[1.25rem] bg-canvas">
-          {/* children render <Scene/> (z-0) then the scroll content
-              (z-10). The readability scrim used to sit between them, but it
-              read as a dark panel behind the type; removed in favour of a
-              subtle per-text shadow (see .text-legible in globals.css) so
-              the type stays readable over the terrain without a box. */}
+          {/* Readability scrim. Sits between the scene (z-0) and the scroll
+              content (z-10): a soft, full-bleed darkening of the screen so the
+              editorial type reads cleanly over the terrain. A previous version
+              was removed for looking like a hard panel behind the type — this
+              is deliberately gentle (low-opacity black, no edges, no box) so it
+              reads as the screen being a touch dimmer under the content, not as
+              a plate. Dark mode only; the light/paper theme needs no scrim.
+              Pointer-events-none so it never eats scroll/clicks. */}
+          <div
+            aria-hidden
+            className="content-scrim pointer-events-none absolute inset-0 z-[5]"
+          />
+          {/* A SECOND grain pass, scoped to the island and clipped to its
+              rounded screen. It sits ABOVE the scene + scrim (z-6) but BELOW
+              the content (z-10), so it gives the screen surface extra tooth
+              where the user wanted more texture, without piling grain onto the
+              editorial type. Stacks additively (screen blend) on top of the
+              page-wide layer. */}
+          <GrainOverlay position="absolute" amount={0.16} />
+          {/* children render <Scene/> (z-0) then the scroll content (z-10). */}
           {children}
         </div>
 

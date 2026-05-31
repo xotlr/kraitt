@@ -16,7 +16,13 @@ import * as THREE from "three";
 import { useDeviceCapability } from "@/hooks/use-device-capability";
 import { Atmosphere } from "./atmosphere";
 import { CameraRig } from "./camera-rig";
+import { FrameCap } from "./frame-cap";
+import { SceneBoundary } from "./scene-boundary";
 import { Terrain } from "./terrain";
+
+// Hoisted out of JSX so re-renders (tab visibility toggles) don't allocate a
+// new Vector2 and re-init the chromatic-aberration pass each time.
+const CA_OFFSET = new THREE.Vector2(0.0015, 0.0015);
 
 /**
  * Scene composition:
@@ -34,20 +40,44 @@ import { Terrain } from "./terrain";
  *
  * Removed: Noise post pass (was doubling with atmosphere shader grain).
  */
-export function Scene() {
+function SceneImpl() {
   const { tier, reducedMotion } = useDeviceCapability();
   const skip = tier === "low";
 
-  const dpr = useMemo<[number, number] | number>(() => {
-    if (typeof window === "undefined") return 1;
-    return window.innerWidth < 1024 ? 1 : [1, 1.5];
+  // If the GPU drops the WebGL context and the renderer can't restore it, we
+  // surface it as a render error so SceneBoundary swaps to the no-scene
+  // fallback instead of leaving a frozen/blank canvas. Set by the
+  // webglcontextlost handler wired in onCreated.
+  const [contextLost, setContextLost] = useState(false);
+  if (contextLost) throw new Error("WebGL context lost");
+
+  // Track the mobile breakpoint live, not as a one-shot snapshot — a resize
+  // across 1024px (DevTools docking, external monitor, tablet rotation) must
+  // re-derive both the DPR cap and the frame-cap. matchMedia matches the
+  // breakpoint exactly and fires on change. SSR defaults to desktop.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 1023px)");
+    setIsMobile(mql.matches);
+    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
   }, []);
 
+  // Desktop DPR raised 1.5 -> 2 so the scene renders at true Retina/4K
+  // resolution: sharper contours, sharper post FX, and crucially FINER film
+  // grain (grain cell size is in framebuffer pixels, so a higher framebuffer
+  // res = smaller grain on screen). Mobile stays at 1 — the perf gate still
+  // holds there, where it matters most. r3f clamps the upper bound to the
+  // display's real devicePixelRatio, so a 1080p screen never pays for 2x.
+  const dpr = useMemo<[number, number] | number>(
+    () => (isMobile ? 1 : [1, 2]),
+    [isMobile]
+  );
+
   // Pause rendering when the tab is backgrounded. r3f keeps running rAF in a
-  // hidden tab otherwise, burning GPU/battery on a scene nobody can see. We
-  // flip frameloop to "demand" (holds the last frame, no rAF) while hidden
-  // and restore it on return. Restoring to "always" unless reduced-motion,
-  // which always wants "demand". (CLAUDE.md §3 — previously NOT ENFORCED.)
+  // hidden tab otherwise, burning GPU/battery on a scene nobody can see.
+  // (CLAUDE.md §3 — previously NOT ENFORCED.)
   const [tabHidden, setTabHidden] = useState(false);
   useEffect(() => {
     const onVisibility = () => setTabHidden(document.hidden);
@@ -56,8 +86,16 @@ export function Scene() {
     return () =>
       document.removeEventListener("visibilitychange", onVisibility);
   }, []);
-  const frameloop: "always" | "demand" =
-    reducedMotion || tabHidden ? "demand" : "always";
+
+  // The Canvas always runs in "demand": nothing renders unless invalidate()
+  // is called. FrameCap is the only caller, pumping at a fixed FPS — so the
+  // loop is frame-capped to 30 (desktop) / 20 (mobile) instead of the
+  // monitor's native rate. When motion should stop entirely (reduced-motion
+  // preference, or a hidden tab) we pass fps=null: no pump runs, the scene
+  // holds its last painted frame. (CLAUDE.md §3 — frame-cap, previously NOT
+  // ENFORCED.)
+  const capFps: number | null =
+    reducedMotion || tabHidden ? null : isMobile ? 20 : 30;
 
   if (skip) return null;
 
@@ -86,10 +124,23 @@ export function Scene() {
           near: 0.1,
           far: 30,
         }}
-        onCreated={({ camera }) => {
+        onCreated={({ camera, gl }) => {
           camera.lookAt(0, -0.2, -2.5);
+          // A lost context that doesn't restore would otherwise freeze on the
+          // last frame with no signal. preventDefault lets the browser attempt
+          // restoration; if "webglcontextrestored" never fires, we trip the
+          // boundary so the page degrades to the no-scene state.
+          const canvas = gl.domElement;
+          canvas.addEventListener(
+            "webglcontextlost",
+            (e) => {
+              e.preventDefault();
+              setContextLost(true);
+            },
+            { once: true }
+          );
         }}
-        frameloop={frameloop}
+        frameloop="demand"
         // Token, not hardcoded black, so the canvas clear matches the
         // theme during the load gap before the atmosphere mesh paints.
         style={{ background: "var(--color-canvas)" }}
@@ -97,6 +148,7 @@ export function Scene() {
         <Atmosphere />
         <Terrain />
         <CameraRig />
+        <FrameCap fps={capFps} />
 
         <EffectComposer multisampling={0}>
           {/* SMAA — subpixel morphological AA. Lines on the terrain
@@ -142,7 +194,7 @@ export function Scene() {
               The DOM-side SVG CA filter no longer exists (it broke
               backdrop-filter edge blur), so this is the only CA. */}
           <ChromaticAberration
-            offset={new THREE.Vector2(0.0015, 0.0015)}
+            offset={CA_OFFSET}
             radialModulation
             modulationOffset={0.6}
             blendFunction={BlendFunction.NORMAL}
@@ -165,5 +217,18 @@ export function Scene() {
         </EffectComposer>
       </Canvas>
     </div>
+  );
+}
+
+/**
+ * Scene — the public entry. Wraps the WebGL implementation in an error
+ * boundary so a shader-compile failure or an unrecoverable lost context
+ * degrades to the no-scene state instead of blanking the page.
+ */
+export function Scene() {
+  return (
+    <SceneBoundary>
+      <SceneImpl />
+    </SceneBoundary>
   );
 }

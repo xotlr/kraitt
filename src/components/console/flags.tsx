@@ -7,16 +7,22 @@
  * GB (United Kingdom) = Union Jack → English.
  */
 
+import { useId } from "react";
+
 export function FlagAT({ size = 20 }: { size?: number }) {
   const r = Math.round(size * 0.18);
+  // Unique per instance — during the AnimatePresence popLayout swap the
+  // outgoing and incoming flags briefly coexist, and a shared id would make
+  // one flag's clipPath resolve to the other's.
+  const clipId = useId();
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
       <defs>
-        <clipPath id="flag-at-clip">
+        <clipPath id={clipId}>
           <rect width="24" height="24" rx={r} />
         </clipPath>
       </defs>
-      <g clipPath="url(#flag-at-clip)">
+      <g clipPath={`url(#${clipId})`}>
         <rect width="24" height="24" fill="#ed2939" />
         <rect y="8" width="24" height="8" fill="#fff" />
       </g>
@@ -35,14 +41,15 @@ export function FlagAT({ size = 20 }: { size?: number }) {
 
 export function FlagGB({ size = 20 }: { size?: number }) {
   const r = Math.round(size * 0.18);
+  const clipId = useId();
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
       <defs>
-        <clipPath id="flag-gb-clip">
+        <clipPath id={clipId}>
           <rect width="24" height="24" rx={r} />
         </clipPath>
       </defs>
-      <g clipPath="url(#flag-gb-clip)">
+      <g clipPath={`url(#${clipId})`}>
         <rect width="24" height="24" fill="#012169" />
         {/* white diagonals */}
         <path d="M0,0 L24,24 M24,0 L0,24" stroke="#fff" strokeWidth="5" />

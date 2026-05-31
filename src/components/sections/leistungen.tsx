@@ -1,45 +1,15 @@
 "use client";
 
-import { motion, type Variants } from "framer-motion";
+import { motion } from "framer-motion";
 import { SectionHeading } from "@/components/section-heading";
 import { useLanguage } from "@/lib/language-context";
 import { dict } from "@/lib/i18n";
+import { drawX as mkDrawX, fadeUp as mkFadeUp, makeStagger } from "@/lib/motion";
 
-const EASE = [0.22, 1, 0.36, 1] as const;
-
-const columnStagger: Variants = {
-  hidden: {},
-  visible: {
-    transition: {
-      staggerChildren: 0.12,
-      delayChildren: 0.05,
-    },
-  },
-};
-
-const itemStagger: Variants = {
-  hidden: {},
-  visible: {
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.15,
-    },
-  },
-};
-
-const fadeUp: Variants = {
-  hidden: { opacity: 0, y: 16 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.9, ease: EASE },
-  },
-};
-
-const drawX: Variants = {
-  hidden: { scaleX: 0 },
-  visible: { scaleX: 1, transition: { duration: 0.9, ease: EASE } },
-};
+const columnStagger = makeStagger(0.12, 0.05);
+const itemStagger = makeStagger(0.08, 0.15);
+const fadeUp = mkFadeUp(16);
+const drawX = mkDrawX();
 
 export function Leistungen() {
   const { lang } = useLanguage();
@@ -57,7 +27,7 @@ export function Leistungen() {
           title={
             <>
               {t.titleA}
-              <span className="font-serif-italic text-ink">{t.titleEm}</span>
+              <span className="text-accent audio-accent">{t.titleEm}</span>
               {t.titleB}
             </>
           }

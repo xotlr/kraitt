@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { Fraunces, Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import { Island } from "@/components/island";
+import { GrainOverlay } from "@/components/grain-overlay";
 import { ConsolePanel } from "@/components/console/console-panel";
 import { KnobRail } from "@/components/console/knob-rail";
 import { LeftRail } from "@/components/console/left-rail";
@@ -16,14 +17,6 @@ const geist = Geist({
   subsets: ["latin"],
   variable: "--font-display",
   weight: ["200", "300", "400", "500"],
-  display: "swap",
-});
-
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  variable: "--font-serif",
-  axes: ["SOFT", "WONK", "opsz"],
-  style: ["italic"],
   display: "swap",
 });
 
@@ -50,7 +43,7 @@ export default function RootLayout({
     <html
       lang="de"
       suppressHydrationWarning
-      className={`${geist.variable} ${fraunces.variable} ${geistMono.variable}`}
+      className={`${geist.variable} ${geistMono.variable}`}
     >
       <head>
         {/* Set the theme class before first paint so there's no dark→light
@@ -58,7 +51,7 @@ export default function RootLayout({
             the no-flash script the other Pluto sites use. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('sk-theme');if(t==='light')document.documentElement.classList.add('light')}catch(e){}`,
+            __html: `try{var t=localStorage.getItem('sk-theme');if(t==='light')document.documentElement.classList.add('light');var l=localStorage.getItem('sk-lang');if(l==='en')document.documentElement.lang='en'}catch(e){}`,
           }}
         />
       </head>
@@ -147,6 +140,12 @@ export default function RootLayout({
           </LanguageProvider>
           </AudioProvider>
         </ThemeProvider>
+
+        {/* Page-wide film grain — one GPU layer over EVERYTHING (scene,
+            console, type), rendered at full device resolution, screen-blended
+            so the whole page reads as one filmic surface. Outside the providers
+            since it needs no app state; last child so it composites on top. */}
+        <GrainOverlay amount={0.08} />
       </body>
     </html>
   );

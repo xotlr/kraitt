@@ -37,7 +37,9 @@ next-env.d.ts
 
 # local screenshots + playwright artifacts (dev-only, regenerable)
 /.playwright-mcp/
+/test-results/
 /*.png
+/*.jpeg
 !/public/**/*.png
 
 # audio asset is unlicensed dev placeholder, see CLAUDE.md

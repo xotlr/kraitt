@@ -1,53 +1,20 @@
 "use client";
 
-import { motion, type Variants } from "framer-motion";
+import { motion } from "framer-motion";
 import { SectionHeading } from "@/components/section-heading";
 import { useLanguage } from "@/lib/language-context";
 import { dict } from "@/lib/i18n";
+import {
+  drawX as mkDrawX,
+  fadeUp as mkFadeUp,
+  makeStagger,
+  maskUp,
+} from "@/lib/motion";
 
-const EASE = [0.22, 1, 0.36, 1] as const;
-
-const stagger: Variants = {
-  hidden: {},
-  visible: {
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.05,
-    },
-  },
-};
-
-const fadeUp: Variants = {
-  hidden: { opacity: 0, y: 18 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.9, ease: EASE },
-  },
-};
-
-const drawX: Variants = {
-  hidden: { scaleX: 0 },
-  visible: { scaleX: 1, transition: { duration: 1, ease: EASE } },
-};
-
-const emailReveal: Variants = {
-  hidden: {
-    clipPath: "inset(0% 0% 100% 0%)",
-    opacity: 0,
-    y: 14,
-  },
-  visible: {
-    clipPath: "inset(0% 0% 0% 0%)",
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 1.1,
-      ease: EASE,
-      opacity: { duration: 0.6, ease: EASE },
-    },
-  },
-};
+const stagger = makeStagger(0.08, 0.05);
+const fadeUp = mkFadeUp(18);
+const drawX = mkDrawX(1);
+const emailReveal = maskUp(14, 1.1);
 
 const email = "hello@sufiankraitt.com";
 
@@ -72,7 +39,7 @@ export function Kontakt() {
           title={
             <>
               {t.titleA}
-              <span className="font-serif-italic text-ink">{t.titleEm}</span>
+              <span className="text-accent audio-accent">{t.titleEm}</span>
               {t.titleB}
             </>
           }
@@ -137,7 +104,7 @@ export function Kontakt() {
                     rel="noopener noreferrer"
                     className="text-ink-muted hover:text-ink transition-colors duration-500"
                   >
-                    {l.label} ↗
+                    {l.label} <span aria-hidden>↗</span>
                   </a>
                 </motion.li>
               ))}

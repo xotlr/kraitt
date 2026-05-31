@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useContext, useRef, type ReactNode, type RefObject } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useRef,
+  type ReactNode,
+  type RefObject,
+} from "react";
 
 /**
  * Shares the ScrollArea viewport element with anything that wants to
@@ -42,11 +49,17 @@ export function useScrollViewport(): RefObject<HTMLDivElement | null> {
  */
 export function useScrollTo() {
   const viewportRef = useScrollViewport();
-  return (id: string) => (e: React.MouseEvent) => {
-    e.preventDefault();
-    const root = viewportRef.current;
-    const target = document.getElementById(id);
-    if (!root || !target) return;
-    root.scrollTo({ top: target.offsetTop, behavior: "smooth" });
-  };
+  // Memoized so call sites can use it in deps / pass it down without
+  // allocating a fresh handler factory every render. viewportRef identity is
+  // stable (a context ref), so the empty-ish dep list is correct.
+  return useCallback(
+    (id: string) => (e: React.MouseEvent) => {
+      e.preventDefault();
+      const root = viewportRef.current;
+      const target = document.getElementById(id);
+      if (!root || !target) return;
+      root.scrollTo({ top: target.offsetTop, behavior: "smooth" });
+    },
+    [viewportRef]
+  );
 }

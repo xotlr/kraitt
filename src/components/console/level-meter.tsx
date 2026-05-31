@@ -248,7 +248,7 @@ export function ChannelStrip() {
             height: "7px",
             background: clipped
               ? "var(--meter-red)"
-              : "color-mix(in srgb, var(--meter-red) 100%, black 70%)",
+              : "color-mix(in srgb, var(--meter-red) 30%, black)",
             opacity: clipped ? 1 : 0.3,
             filter: clipped ? "brightness(1.2)" : "none",
             boxShadow: clipped

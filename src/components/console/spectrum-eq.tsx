@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useAudio, useAudioLevels } from "@/lib/audio";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 /**
  * SpectrumEq — three live columns (LO / MID / HI) driven by the SAME analyser
@@ -49,10 +50,18 @@ function rampAt(p: number): [number, number, number] {
 const rgb = (c: [number, number, number]) =>
   `rgb(${Math.round(c[0])}, ${Math.round(c[1])}, ${Math.round(c[2])})`;
 
+// Each segment's full-colour ramp value (its position up the column). Constant
+// across all renders, so it lives at module scope — keeping it in the component
+// re-created the array every render and re-subscribed the rAF effect.
+const baseColors = Array.from({ length: SEGMENTS }, (_, i) =>
+  rampAt(i / (SEGMENTS - 1))
+);
+
 export function SpectrumEq() {
   const levels = useAudioLevels();
   const { musicOn, micOn, volume } = useAudio();
   const active = musicOn || micOn;
+  const reduce = useReducedMotion();
 
   // segRefs[band][segment]
   const segRefs = useRef<(HTMLDivElement | null)[][]>([[], [], []]);
@@ -60,16 +69,7 @@ export function SpectrumEq() {
   const volRef = useRef(volume);
   volRef.current = volume;
 
-  // Precompute each segment's full-colour ramp value (its position up the
-  // column). Disabled segments lerp from this toward DISABLED.
-  const baseColors = Array.from({ length: SEGMENTS }, (_, i) =>
-    rampAt(i / (SEGMENTS - 1))
-  );
-
   useEffect(() => {
-    const reduce = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
 
     // Apply the volume-ceiling "disabled" look to a segment: above the ceiling
     // it desaturates toward DISABLED and dims; below it keeps its ramp colour.
@@ -151,7 +151,7 @@ export function SpectrumEq() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [levels, active, baseColors]);
+  }, [levels, active, reduce]);
 
   return (
     <div

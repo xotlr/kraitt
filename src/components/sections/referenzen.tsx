@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion, type Variants } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useMemo, useState } from "react";
 import { SectionHeading } from "@/components/section-heading";
 import {
@@ -13,6 +13,12 @@ import { projects, type Category, type Project } from "@/data/projects";
 import { useLanguage } from "@/lib/language-context";
 import { dict } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import {
+  EASE,
+  drawX as mkDrawX,
+  fadeUp as mkFadeUp,
+  makeStagger,
+} from "@/lib/motion";
 
 /** A project merged with its localized copy for the active language. */
 type LocalizedProject = Project & {
@@ -22,50 +28,11 @@ type LocalizedProject = Project & {
   credits: { label: string; value: string }[];
 };
 
-const EASE = [0.22, 1, 0.36, 1] as const;
-
-const filterStagger: Variants = {
-  hidden: {},
-  visible: {
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.05,
-    },
-  },
-};
-
-const fadeUp: Variants = {
-  hidden: { opacity: 0, y: 14 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.8, ease: EASE },
-  },
-};
-
-const drawX: Variants = {
-  hidden: { scaleX: 0 },
-  visible: { scaleX: 1, transition: { duration: 1, ease: EASE } },
-};
-
-const listContainer: Variants = {
-  hidden: {},
-  visible: {
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.05,
-    },
-  },
-};
-
-const rowVariants: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.8, ease: EASE },
-  },
-};
+const filterStagger = makeStagger(0.08, 0.05);
+const fadeUp = mkFadeUp(14, 0.8);
+const drawX = mkDrawX(1);
+const listContainer = makeStagger(0.08, 0.05);
+const rowVariants = mkFadeUp(20, 0.8);
 
 export function Referenzen() {
   const { lang } = useLanguage();
@@ -99,7 +66,7 @@ export function Referenzen() {
           title={
             <>
               {t.titleA}
-              <span className="font-serif-italic text-ink">{t.titleEm}</span>
+              <span className="text-accent audio-accent">{t.titleEm}</span>
             </>
           }
         />

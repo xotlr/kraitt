@@ -6,9 +6,8 @@ import { SECTIONS } from "@/components/console/controls";
 import { LanguageToggle } from "@/components/console/language-toggle";
 import { StudioButton } from "@/components/console/studio-button";
 import { ThemeToggle } from "@/components/console/theme-toggle";
-import { useActiveSection } from "@/components/console/use-active-section";
+import { useSectionNav } from "@/components/console/use-active-section";
 import { useAudio } from "@/lib/audio";
-import { useScrollTo } from "@/lib/scroll-context";
 import { useLanguage } from "@/lib/language-context";
 import { dict } from "@/lib/i18n";
 import type { Dict } from "@/lib/i18n";
@@ -23,21 +22,11 @@ import type { Dict } from "@/lib/i18n";
  * Section presses fire a manual wave pulse when audio is off.
  */
 export function ConsolePanel() {
-  const active = useActiveSection();
-  const scrollTo = useScrollTo();
+  const { active, handleSection } = useSectionNav();
   const { lang } = useLanguage();
   const c = dict(lang).console;
   const nav = dict(lang).nav;
-  const { musicOn, micOn, musicStatus, toggleMusic, toggleMic, triggerPulse } =
-    useAudio();
-  const audioOff = !musicOn && !micOn;
-
-  const handleSection =
-    (id: string): React.MouseEventHandler<HTMLButtonElement> =>
-    (e) => {
-      if (audioOff) triggerPulse();
-      scrollTo(id)(e);
-    };
+  const { musicOn, micOn, musicStatus, toggleMusic, toggleMic } = useAudio();
 
   return (
     <motion.div

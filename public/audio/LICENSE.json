@@ -1,0 +1,9 @@
+{
+  "$comment": "Declares the licensing status of ambient.mp3. The license-gate test (tests/audio-license.spec.ts) FAILS while cleared=false, so the unlicensed placeholder cannot ship silently. Before deploy: replace ambient.mp3 with a PD / properly-licensed / silent track, then set cleared=true and fill in source + license.",
+  "file": "ambient.mp3",
+  "cleared": false,
+  "source": "Clair Obscur: Expedition 33 OST — 'Une Vie à t'Aimer' (Sandfall Interactive / Lorien Testard)",
+  "license": "© All rights reserved — DEVELOPMENT-ONLY PLACEHOLDER, NOT LICENSED FOR REDISTRIBUTION",
+  "attributionRequired": false,
+  "attributionText": null
+}

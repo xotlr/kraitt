@@ -1,68 +1,26 @@
 "use client";
 
-import { motion, type Variants } from "framer-motion";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useAudioGlow } from "@/hooks/use-audio-glow";
+import { drawX, fadeUp, makeStagger, maskUp } from "@/lib/motion";
 
-// Audio-reactive COLOUR (not a glow). useAudioGlow writes --audio-tint onto
-// the heading each frame — a colour sampled from the desk's shared intensity
-// ramp (cold blue when quiet → gold on a peak). At rest the var is unset so
-// the heading falls back to its normal ink. No shadow, no movement: the type
-// just warms with the music.
-const audioGlowStyle: React.CSSProperties = {
+// The heading itself stays NEUTRAL ink. useAudioGlow still writes
+// --audio-tint / --audio-glow onto this <h2> each frame, but the heading no
+// longer consumes them — instead the vars INHERIT down to the Fraunces
+// italic accent inside the title (the .audio-accent span), which is the
+// element that now warms and blooms with the music. Seeding --audio-glow: 0
+// here gives the accent a defined resting value before the first rAF write.
+const audioVarSeed: React.CSSProperties = {
   // @ts-expect-error — custom property, valid CSS, not in the TS type
   "--audio-glow": 0,
-  color: "var(--audio-tint, var(--color-ink))",
 };
 
-const EASE = [0.22, 1, 0.36, 1] as const;
-
-const container: Variants = {
-  hidden: {},
-  visible: {
-    transition: {
-      staggerChildren: 0.12,
-      delayChildren: 0.05,
-    },
-  },
-};
-
-const fadeUp: Variants = {
-  hidden: { opacity: 0, y: 12 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.9, ease: EASE },
-  },
-};
-
-const drawX: Variants = {
-  hidden: { scaleX: 0 },
-  visible: {
-    scaleX: 1,
-    transition: { duration: 1.1, ease: EASE },
-  },
-};
-
+const container = makeStagger(0.12, 0.05);
+const headingFade = fadeUp(12);
+const headingDraw = drawX(1.1);
 // Title masks in from below using a clip-path inset.
-// inset(top right bottom left) — animate bottom: 100% -> 0%.
-const titleReveal: Variants = {
-  hidden: {
-    clipPath: "inset(0% 0% 100% 0%)",
-    y: 18,
-    opacity: 0,
-  },
-  visible: {
-    clipPath: "inset(0% 0% 0% 0%)",
-    y: 0,
-    opacity: 1,
-    transition: {
-      duration: 1.15,
-      ease: EASE,
-      opacity: { duration: 0.6, ease: EASE },
-    },
-  },
-};
+const titleReveal = maskUp(18, 1.15);
 
 export function SectionHeading({
   index,
@@ -85,22 +43,22 @@ export function SectionHeading({
       className={cn("mb-16 md:mb-28", className)}
     >
       <div className="flex items-baseline gap-4 md:gap-6 mb-8 md:mb-10 eyebrow">
-        <motion.span variants={fadeUp} className="text-ink">
+        <motion.span variants={headingFade} className="text-ink">
           {index}
         </motion.span>
         <motion.span
-          variants={drawX}
+          variants={headingDraw}
           style={{ transformOrigin: "left center" }}
           className="h-px flex-1 bg-hairline"
         />
-        <motion.span variants={fadeUp}>{label}</motion.span>
+        <motion.span variants={headingFade}>{label}</motion.span>
       </div>
       <div className="overflow-hidden pb-[0.15em]">
         <motion.h2
           ref={titleRef}
           variants={titleReveal}
-          style={audioGlowStyle}
-          className="font-heading text-h1 leading-[var(--text-h1--line-height)] max-w-[18ch] text-balance text-legible"
+          style={audioVarSeed}
+          className="font-heading text-h1 leading-[var(--text-h1--line-height)] max-w-[18ch] text-balance text-legible text-ink"
         >
           {title}
         </motion.h2>

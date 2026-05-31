@@ -1,39 +1,23 @@
 "use client";
 
-import { motion, type Variants } from "framer-motion";
+import { motion } from "framer-motion";
 import { SectionHeading } from "@/components/section-heading";
 import { useLanguage } from "@/lib/language-context";
 import { dict } from "@/lib/i18n";
+import { useAudioGlow } from "@/hooks/use-audio-glow";
+import { drawX as mkDrawX, fadeUp as mkFadeUp, makeStagger } from "@/lib/motion";
 
-const EASE = [0.22, 1, 0.36, 1] as const;
-
-const stagger: Variants = {
-  hidden: {},
-  visible: {
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.1,
-    },
-  },
-};
-
-const fadeUp: Variants = {
-  hidden: { opacity: 0, y: 18 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.9, ease: EASE },
-  },
-};
-
-const drawX: Variants = {
-  hidden: { scaleX: 0 },
-  visible: { scaleX: 1, transition: { duration: 0.9, ease: EASE } },
-};
+const stagger = makeStagger(0.08, 0.1);
+const fadeUp = mkFadeUp(18);
+const drawX = mkDrawX();
 
 export function Ueber() {
   const { lang } = useLanguage();
   const t = dict(lang).ueber;
+  // Drives --audio-tint/--audio-glow onto the prose block so the Fraunces
+  // italic accents inside it (p1Em / p2Em) warm with the music. The heading
+  // accent gets the same vars from SectionHeading's own ref.
+  const proseRef = useAudioGlow<HTMLDivElement>();
   return (
     <section
       id="ueber"
@@ -46,7 +30,7 @@ export function Ueber() {
           title={
             <>
               {t.titleA}
-              <span className="font-serif-italic text-ink">{t.titleEm}</span>
+              <span className="text-accent audio-accent">{t.titleEm}</span>
               {t.titleB}
             </>
           }
@@ -54,6 +38,7 @@ export function Ueber() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20">
           <motion.div
+            ref={proseRef}
             variants={stagger}
             initial="hidden"
             whileInView="visible"
@@ -62,12 +47,12 @@ export function Ueber() {
           >
             <motion.p variants={fadeUp}>
               {t.p1a}
-              <span className="font-serif-italic text-ink">{t.p1Em}</span>
+              <span className="text-accent audio-accent">{t.p1Em}</span>
               {t.p1b}
             </motion.p>
             <motion.p variants={fadeUp}>
               {t.p2a}
-              <span className="font-serif-italic text-ink">{t.p2Em}</span>
+              <span className="text-accent audio-accent">{t.p2Em}</span>
               {t.p2b}
             </motion.p>
             <motion.p variants={fadeUp} className="text-ink-muted">
@@ -82,23 +67,29 @@ export function Ueber() {
             viewport={{ once: true, margin: "-10%" }}
             className="lg:col-span-3 lg:col-start-10"
           >
-            <dl className="space-y-4 font-mono text-[10px] uppercase tracking-[0.18em]">
+            {/* A key/value fact grid. This is a styled list of label→value
+                pairs, not prose definitions, so it's a plain <ul> rather than a
+                <dl> — which lets each row also hold the animated hairline span
+                without tripping axe's strict definition-list structure rule.
+                The label/value relationship is conveyed visually + by order. */}
+            <ul className="space-y-4 font-mono text-[10px] uppercase tracking-[0.18em]">
               {t.facts.map((f) => (
-                <motion.div
+                <motion.li
                   key={f.k}
                   variants={fadeUp}
                   className="relative flex justify-between pb-3"
                 >
-                  <dt className="text-ink-faint">{f.k}</dt>
-                  <dd className="text-ink/85">{f.v}</dd>
+                  <span className="text-ink-faint">{f.k}</span>
+                  <span className="text-ink/85">{f.v}</span>
                   <motion.span
+                    aria-hidden
                     variants={drawX}
                     style={{ transformOrigin: "left center" }}
                     className="absolute inset-x-0 bottom-0 h-px bg-hairline"
                   />
-                </motion.div>
+                </motion.li>
               ))}
-            </dl>
+            </ul>
           </motion.div>
         </div>
       </div>

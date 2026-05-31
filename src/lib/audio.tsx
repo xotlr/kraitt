@@ -184,14 +184,17 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     setMuted((m) => {
       const next = !m;
       mutedRef.current = next;
-      // Apply to the live element immediately; the fader's `volume` value is
-      // untouched so the cap + fill stay put and un-mute restores that level.
+      // Apply to the live element immediately; the fader's value is untouched
+      // so the cap + fill stay put and un-mute restores that level. Read it
+      // from volumeRef (not the `volume` state) so this callback's identity
+      // stays stable — otherwise every fader tick rebuilds the context value
+      // and re-renders every audio consumer.
       if (audioElRef.current) {
-        audioElRef.current.volume = next ? 0 : volume;
+        audioElRef.current.volume = next ? 0 : volumeRef.current;
       }
       return next;
     });
-  }, [volume]);
+  }, []);
 
   // Levels object shared by reference with the shader hook. We mutate
   // .bass/.mid/.high in place each frame; React does not re-render.
@@ -226,7 +229,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     const analyser = ctx.createAnalyser();
     analyser.fftSize = FFT_SIZE;
     analyser.smoothingTimeConstant = 0.5;
-    analyser.connect(ctx.destination); // music plays through; mic graph won't connect through here.
+    // The analyser is a metering TAP, never wired to destination. Each source
+    // connects to it for analysis; only the MUSIC source also connects to
+    // destination (so it's audible). The mic feeds the tap but not the
+    // speakers — otherwise live input loops straight back as feedback.
     ctxRef.current = ctx;
     analyserRef.current = analyser;
     fftBufRef.current = new Uint8Array(
@@ -247,10 +253,13 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       el.loop = true;
       el.crossOrigin = "anonymous";
       el.preload = "auto";
-      el.volume = mutedRef.current ? 0 : volume;
+      el.volume = mutedRef.current ? 0 : volumeRef.current;
       audioElRef.current = el;
       const src = ctx.createMediaElementSource(el);
-      // Music graph: source -> analyser -> destination
+      // Music graph: source -> destination (audible) and source -> analyser
+      // (metering tap). The analyser is NOT chained to destination, so the
+      // mic — which only feeds the tap — never reaches the speakers.
+      src.connect(ctx.destination);
       src.connect(analyserRef.current!);
       musicSrcRef.current = src;
     }
@@ -315,12 +324,20 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     }
   }, [ensureContext, micOn]);
 
-  // Clear any pending status-reset timer when provider unmounts.
+  // Tear the whole audio graph down when the provider unmounts: clear the
+  // pending status timer, stop the mic stream's tracks (releases the OS
+  // capture indicator), and close the AudioContext (frees the hardware
+  // stream + the analyser). Matters in dev (strict-mode double-mount, HMR)
+  // and any future route that unmounts the provider.
   useEffect(() => {
     return () => {
       if (statusResetTimerRef.current) {
         clearTimeout(statusResetTimerRef.current);
       }
+      micStreamRef.current?.getTracks().forEach((t) => t.stop());
+      micStreamRef.current = null;
+      void ctxRef.current?.close();
+      ctxRef.current = null;
     };
   }, []);
 
