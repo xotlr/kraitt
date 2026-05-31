@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { RailLabel } from "@/components/console/rail-primitives";
+import { useAudioGlow } from "@/hooks/use-audio-glow";
 import { cn } from "@/lib/utils";
 
 /**
@@ -31,9 +32,9 @@ import { cn } from "@/lib/utils";
 export type ButtonTone = "nav" | "play" | "rec";
 
 const TONE_COLOR: Record<ButtonTone, string> = {
-  nav: "#b8845c", // amber — sections / transport
-  play: "#5ec27a", // green — playback source live
-  rec: "#e0524e", // red — mic / record-armed
+  nav: "#c2a578", // on-theme gold — sections (matches the EQ/scene peak)
+  play: "#5ec27a", // green — playback source live (kept: signal convention)
+  rec: "#e0524e", // red — mic / record-armed (kept: signal convention)
 };
 
 export function StudioButton({
@@ -79,6 +80,11 @@ export function StudioButton({
   const toneColor = TONE_COLOR[tone];
   // A seated, pressed-in cap only when the button genuinely latches.
   const latched = active && latch;
+  // Beat pulse — writes --audio-glow (0..1) on the cap each frame from the
+  // shared audio levels. The active icon's glow scales with it, so a lit
+  // button breathes with the music. Idle buttons set the var too but don't
+  // read it (no glow), so nothing strobes — only active caps pulse.
+  const glowRef = useAudioGlow<HTMLSpanElement>();
   return (
     <button
       type="button"
@@ -143,18 +149,13 @@ export function StudioButton({
             ? [
                 // seated-in: deep inner top shadow = cap pushed down into the
                 // panel; a faint bottom lip catches the key light at the floor.
+                // No tone glow on the cap itself — the GLOW comes from the lit
+                // icon now (drop-shadow on the glyph below), so the colour
+                // reads as the indicator emitting, not the whole pad haloing.
                 "inset 0 3px 5px color-mix(in srgb, black 55%, transparent)",
                 "inset 0 1px 2px color-mix(in srgb, black 45%, transparent)",
                 "inset 0 -1px 0 color-mix(in srgb, var(--console-cap-hi) 70%, transparent)",
                 "0 0 0 1px var(--console-edge)",
-                // SLIGHT tone glow — the cap is lit from within in its function
-                // colour when seated. Restrained (low alpha, tight radius) so it
-                // reads as a faint indicator bloom, not a neon ring. This is the
-                // one place the desk emits colour rather than just reflecting the
-                // key light. Overrides the old depth-only (no-glow) active state.
-                latch
-                  ? `0 0 10px color-mix(in srgb, ${toneColor} 30%, transparent), 0 0 2px color-mix(in srgb, ${toneColor} 22%, transparent)`
-                  : "0 0 0 transparent",
               ].join(",")
             : [
                 // raised pad under a raked top-left key light: the lit bevel
@@ -179,16 +180,6 @@ export function StudioButton({
             own glow). Pointer-events-none, sits under the icon. Gives the
             "slight glow" + the sense the control is live on approach without
             adding a permanent ring. */}
-        {!latched && !disabled && (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-            style={{
-              borderRadius: "var(--console-cap-radius, 7px)",
-              boxShadow: `0 0 9px color-mix(in srgb, ${toneColor} 22%, transparent), inset 0 0 0 1px color-mix(in srgb, ${toneColor} 14%, transparent)`,
-            }}
-          />
-        )}
         {dot && (
           <span
             aria-hidden
@@ -201,7 +192,31 @@ export function StudioButton({
             }}
           />
         )}
-        {children}
+        {/* The icon itself emits the glow — a tone-coloured drop-shadow on the
+            glyph, so the light reads as the indicator lighting up rather than
+            the whole cap haloing. Full when active; a faint bloom fades in on
+            hover for idle caps. */}
+        <span
+          ref={glowRef}
+          className={cn(
+            "relative inline-flex",
+            !active && !disabled && "group-hover:[filter:var(--icon-glow-hover)]"
+          )}
+          style={
+            {
+              "--audio-glow": 0,
+              // Active glow = a steady base bloom PLUS a beat-driven bloom whose
+              // radius + opacity scale with --audio-glow, so the lit icon pulses
+              // on the beat. Idle uses no filter; hover uses the static bloom.
+              filter: active
+                ? `drop-shadow(0 0 2px color-mix(in srgb, ${toneColor} 60%, transparent)) drop-shadow(0 0 calc(4px + var(--audio-glow) * 7px) color-mix(in srgb, ${toneColor} calc(45% + var(--audio-glow) * 45%), transparent))`
+                : undefined,
+              "--icon-glow-hover": `drop-shadow(0 0 4px color-mix(in srgb, ${toneColor} 45%, transparent))`,
+            } as React.CSSProperties
+          }
+        >
+          {children}
+        </span>
       </motion.span>
       {label != null && <RailLabel active={active}>{label}</RailLabel>}
     </button>

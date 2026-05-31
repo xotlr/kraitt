@@ -30,6 +30,10 @@ const fraunces = Fraunces({
 const geistMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
+  // 400 (default mono) + 500 — the type weight ladder bumped mono/eyebrow
+  // to --weight-mono: 500, which needs the real cut loaded or the browser
+  // synthesizes a faux-bold. Keep in sync with --weight-mono in globals.css.
+  weight: ["400", "500"],
   display: "swap",
 });
 

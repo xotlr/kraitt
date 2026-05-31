@@ -36,6 +36,12 @@ type AudioState = {
   /** 0..1, applied to the music element's volume. Not mic. */
   volume: number;
   setVolume: (v: number) => void;
+  /** Master mute. Independent of the fader (a real desk's mute kills output
+   *  without moving the fader, and un-mute restores the set level). When
+   *  muted the music element is silenced but `volume` keeps its value so the
+   *  fader cap + fill stay where the user left them. */
+  muted: boolean;
+  toggleMute: () => void;
   toggleMusic: () => Promise<void>;
   toggleMic: () => Promise<void>;
   /** Fire a one-shot manual "pluck" — the console buttons call this so a
@@ -91,6 +97,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const [micOn, setMicOn] = useState(false);
   const [musicStatus, setMusicStatus] = useState<MusicStatus>("idle");
   const [volume, setVolumeState] = useState<number>(DEFAULT_VOLUME);
+  const [muted, setMuted] = useState(false);
   const statusResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
@@ -112,11 +119,22 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Live mute state read inside setVolume without re-creating the callback
+  // (so its identity stays stable in the context value).
+  const mutedRef = useRef(false);
+
   const setVolume = useCallback((v: number) => {
     const clamped = Math.max(0, Math.min(1, v));
     setVolumeState(clamped);
+    // Moving the fader off zero implicitly un-mutes — you grabbed the fader,
+    // you want sound. Matches how a desk behaves: riding the fader overrides
+    // a mute. (Setting it TO zero leaves mute as-is.)
+    if (clamped > 0 && mutedRef.current) {
+      mutedRef.current = false;
+      setMuted(false);
+    }
     if (audioElRef.current) {
-      audioElRef.current.volume = clamped;
+      audioElRef.current.volume = mutedRef.current ? 0 : clamped;
     }
     try {
       window.localStorage.setItem(VOLUME_STORAGE_KEY, String(clamped));
@@ -124,6 +142,19 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       // ignore storage failures
     }
   }, []);
+
+  const toggleMute = useCallback(() => {
+    setMuted((m) => {
+      const next = !m;
+      mutedRef.current = next;
+      // Apply to the live element immediately; the fader's `volume` value is
+      // untouched so the cap + fill stay put and un-mute restores that level.
+      if (audioElRef.current) {
+        audioElRef.current.volume = next ? 0 : volume;
+      }
+      return next;
+    });
+  }, [volume]);
 
   // Levels object shared by reference with the shader hook. We mutate
   // .bass/.mid/.high in place each frame; React does not re-render.
@@ -166,7 +197,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       el.loop = true;
       el.crossOrigin = "anonymous";
       el.preload = "auto";
-      el.volume = volume;
+      el.volume = mutedRef.current ? 0 : volume;
       audioElRef.current = el;
       const src = ctx.createMediaElementSource(el);
       // Music graph: source -> analyser -> destination
@@ -348,6 +379,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       musicStatus,
       volume,
       setVolume,
+      muted,
+      toggleMute,
       toggleMusic,
       toggleMic,
       triggerPulse,
@@ -358,6 +391,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       musicStatus,
       volume,
       setVolume,
+      muted,
+      toggleMute,
       toggleMusic,
       toggleMic,
       triggerPulse,

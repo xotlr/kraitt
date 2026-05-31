@@ -1,5 +1,12 @@
 "use client";
 
+import {
+  Microphone,
+  Pause,
+  Play,
+  SpeakerSimpleHigh,
+  SpeakerSimpleSlash,
+} from "@phosphor-icons/react";
 import { motion, type Variants } from "framer-motion";
 import { SECTIONS } from "@/components/console/controls";
 import { LanguageToggle } from "@/components/console/language-toggle";
@@ -10,21 +17,19 @@ import { useAudio } from "@/lib/audio";
 import { useScrollTo } from "@/lib/scroll-context";
 
 /**
- * KnobRail — the RIGHT console column: a single vertical row of tactile
- * studio buttons, icon-only (no text) to keep chrome minimal. Each
- * section button shows its Phosphor icon as an outline, filling amber +
- * depressing when its section is in view; click to scroll there. The
- * language toggle is the same kind of button at the bottom.
+ * KnobRail — the RIGHT console column: ALL the tactile controls. The LEFT
+ * rail is the metering instrument (VU + fader + meter + EQ); everything you
+ * click lives here. Top to bottom: the brand plate, the section nav, the
+ * audio transport (play/mic/mute), and the site settings (theme/language).
  *
- * When no audio source is playing, pressing a section button also fires
- * a manual wave pulse (triggerPulse) so the desk visibly drives the
- * signal even in silence.
+ * Section presses fire a manual wave pulse when no audio source is playing,
+ * so the desk visibly drives the signal even in silence.
  *
  * lg+ only; below lg the bottom ConsolePanel takes over.
  */
 const rail: Variants = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.08, delayChildren: 0.5 } },
+  show: { transition: { staggerChildren: 0.07, delayChildren: 0.5 } },
 };
 const item: Variants = {
   hidden: { opacity: 0, x: 14 },
@@ -34,7 +39,8 @@ const item: Variants = {
 export function KnobRail() {
   const active = useActiveSection();
   const scrollTo = useScrollTo();
-  const { musicOn, micOn, triggerPulse } = useAudio();
+  const { musicOn, micOn, musicStatus, muted, toggleMute, toggleMusic, toggleMic, triggerPulse } =
+    useAudio();
   const audioOff = !musicOn && !micOn;
 
   const handleSection =
@@ -49,17 +55,84 @@ export function KnobRail() {
       variants={rail}
       initial="hidden"
       animate="show"
-      className="hidden lg:flex shrink-0 flex-col items-center justify-between select-none"
+      className="hidden lg:flex shrink-0 flex-col items-center justify-between gap-3 select-none"
       style={{
         width: "var(--console-rail-w)",
         paddingTop: "var(--console-rail-inset)",
         paddingBottom: "var(--console-rail-inset)",
       }}
     >
-      {/* Section navigation — its own landmark, pinned to the TOP. The
-          settings group below is intentionally OUTSIDE this <nav> so AT
-          users find section links here and site controls as their own
-          group, not unexpectedly inside navigation. */}
+      {/* TOP — brand plate + audio transport directly beneath it. */}
+      <div className="flex flex-col items-center gap-3">
+        {/* Brand plate — the wordmark, the desk's name tag. Same recessed
+            pill as the clusters; links home. */}
+        <motion.div variants={item} className="console-group">
+          <a
+            href="#hero"
+            onClick={scrollTo("hero")}
+            className="flex items-center justify-center font-display text-sm leading-none text-ink-muted hover:text-ink transition-colors"
+            style={{ width: "var(--console-unit)", height: "var(--console-unit)" }}
+          >
+            sk
+          </a>
+        </motion.div>
+
+        {/* Audio sources / transport — play-pause, mic, master mute, tucked
+            under the brand. Colour-coded: green transport, red mic/mute. */}
+        <motion.div
+          variants={item}
+          role="group"
+          aria-label="Audioquellen"
+          className="console-group flex flex-col items-center gap-1.5"
+        >
+          <StudioButton
+            active={musicOn}
+            tone="play"
+            dot
+            disabled={musicStatus === "unavailable"}
+            onClick={toggleMusic}
+            ariaLabel={
+              musicStatus === "unavailable"
+                ? "Musik — nicht verfügbar"
+                : musicOn
+                  ? "Pause"
+                  : "Wiedergabe"
+            }
+          >
+            {musicOn ? (
+              <Pause size={17} weight="fill" />
+            ) : (
+              <Play size={17} weight="fill" />
+            )}
+          </StudioButton>
+          <StudioButton
+            active={micOn}
+            tone="rec"
+            dot
+            onClick={toggleMic}
+            ariaLabel="Mikrofon"
+          >
+            <Microphone size={19} weight={micOn ? "fill" : "regular"} />
+          </StudioButton>
+          {/* Master mute — kills output without moving the fader, latches red. */}
+          <StudioButton
+            active={muted}
+            tone="rec"
+            dot
+            onClick={toggleMute}
+            ariaLabel={muted ? "Stumm aufheben" : "Stummschalten"}
+          >
+            {muted ? (
+              <SpeakerSimpleSlash size={18} weight="fill" />
+            ) : (
+              <SpeakerSimpleHigh size={18} weight="regular" />
+            )}
+          </StudioButton>
+        </motion.div>
+      </div>
+
+      {/* MIDDLE — section navigation, centred between the transport above and
+          the settings below (justify-between spaces the three zones out). */}
       <nav aria-label="Sektionen" className="console-group flex flex-col items-center gap-1.5">
         {SECTIONS.map((s) => {
           const Icon = s.icon;
@@ -80,8 +153,7 @@ export function KnobRail() {
         })}
       </nav>
 
-      {/* Theme + language — site controls, NOT navigation. Their own
-          labelled group, pinned to the BOTTOM of the rail. */}
+      {/* BOTTOM — theme + language, site controls (NOT navigation). */}
       <motion.div
         variants={item}
         role="group"
@@ -89,8 +161,6 @@ export function KnobRail() {
         className="console-group flex flex-col items-center gap-1.5"
       >
         <ThemeToggle iconSize={18} />
-        {/* Language toggle — flag switch. Functional state (persists, sets
-            <html lang>); copy translation is a later pass. */}
         <LanguageToggle iconSize={18} />
       </motion.div>
     </motion.div>

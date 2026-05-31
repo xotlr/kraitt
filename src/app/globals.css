@@ -6,10 +6,10 @@
      whole site stops reading as a black void while the scene keeps a hard
      edge (the WebGL fills this anyway; it only shows at the screen rim and
      on load). The CHASSIS around it is the lighter --color-bezel below. */
-  --color-canvas: #050608;
+  --color-canvas: #060707;
   /* Slightly raised surfaces (dialog) sit a hair above pure black so
      they're visible when overlaid. Biased cool. */
-  --color-canvas-elevated: #0a0a0c;
+  --color-canvas-elevated: #0a0a0b;
 
   /* The CHASSIS — the desk the whole machine is built into. The bezel/
      gutter around the screen and the body behind the rails use this, NOT
@@ -19,7 +19,7 @@
      the rail's surface detail, so the field itself can go this dark). Was a
      lighter #101116; dropped per design so the gutter recedes. The scene's
      own backdrop stays --color-canvas (near-black) for its hard edge. */
-  --color-bezel: #07090f;
+  --color-bezel: #090909;
 
   /* Type sits slightly cool of cream — pale, not amber. */
   --color-ink: #ece8df;
@@ -29,14 +29,14 @@
   /* Hairlines bias cool and a notch brighter than before so they're
      visible against pure black (the old #1a1c1f was tuned for the
      #060708 bed and got swallowed at #000). */
-  --color-hairline: #1c1f24;
-  --color-hairline-hover: #2c3038;
+  --color-hairline: #1e2022;
+  --color-hairline-hover: #2e3034;
 
   /* String color for the shader — pale cool-cream, cited in CSS so
      the two systems share the same source of truth. The hero's
      trailing dot picks this up so the wordmark belongs to the same
      cold palette as the strands. */
-  --color-string: #e6dfd1;
+  --color-string: #e3e0da;
 
   /* ── Console graphite ladder ──────────────────────────────────────────
      The scene matte stays OLED-black; the CONSOLE chrome does not. A real
@@ -46,15 +46,15 @@
      graphite steps give the rails a surface that catches light. Biased a
      touch cool/blue, like anodized aluminium under a studio key light.
      Used only by components/console/* — never by the scene or editorial. */
-  --console-panel: #191b21; /* the faceplate the rails are milled from */
-  --console-panel-hi: #23252d; /* panel's top edge, catching the key light */
-  --console-cap: #25272f; /* a raised control cap — LIGHTER than the panel */
-  --console-cap-hi: #34373f; /* cap's lit top bevel */
-  --console-recess: #0a0b0e; /* routed slots / meter window — darker than all */
-  --console-edge: #050608; /* the hard shadow line where a cap meets the panel */
+  --console-panel: #1b1c1e; /* the faceplate the rails are milled from */
+  --console-panel-hi: #25262a; /* panel's top edge, catching the key light */
+  --console-cap: #27282b; /* a raised control cap — LIGHTER than the panel */
+  --console-cap-hi: #35363a; /* cap's lit top bevel */
+  --console-recess: #0b0b0c; /* routed slots / meter window — darker than all */
+  --console-edge: #060606; /* the hard shadow line where a cap meets the panel */
   /* Silkscreen — the pale legend ink printed on the panel (labels, ticks).
-     Cool grey, low-contrast like real panel print, never pure white. */
-  --console-print: #6f7480;
+     Neutral grey, low-contrast like real panel print, never pure white. */
+  --console-print: #74757a;
 
   --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-serif), ui-serif, Georgia, serif;
@@ -81,6 +81,21 @@
 
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ── Type weight ladder ───────────────────────────────────────────────
+     One knob per role. Geist is loaded at discrete cuts (200/300/400/500),
+     so these MUST be values that exist or the browser snaps anyway. Bumped
+     up a rung across the board — the old ladder (display 200, heading 250,
+     mono unset→400) read thin/cheap. Every font utility below reads from
+     these, so reweighting the whole site is editing this block, nothing
+     else. Hero/display shares --weight-display (intentionally heavier than
+     the CLAUDE.md "200–300" note — deliberate, the wordmark was too wispy
+     over the scene). */
+  --weight-display: 300;
+  --weight-heading: 400;
+  --weight-body: 500;
+  --weight-body-emphasis: 400; /* the serif-italic accent inside body copy */
+  --weight-mono: 500;
 }
 
 :root {
@@ -97,9 +112,11 @@
   --console-unit: 40px;
   --console-rail-pad: 14px; /* breathing room each side of a cap in the rail */
   --console-rail-w: calc(var(--console-unit) + var(--console-rail-pad) * 2);
-  /* The channel strip is exactly one button cap wide so the fader+meter
-     column lines up flush with the source buttons above it. Both rails
-     therefore share the same width. */
+  /* The channel strip holds the EQ (with the volume handle riding across it)
+     and the VU dial above. Sized so its navpill ends up the SAME width as the
+     right rail's button pills (--console-unit + 2·pad), so the strip sits the
+     exact same gap off the screen as the section buttons do on the right —
+     symmetric framing, both content blocks the same distance from their walls. */
   --console-strip-w: var(--console-unit);
   --console-left-rail-w: var(--console-rail-w);
   /* The screen card's corner radius (mirrors the rounded-[1.25rem] on the
@@ -115,7 +132,7 @@
      so a pill is always a recess into the real surface. Light mode overrides
      it below (must stay unlayered to beat @layer base). */
   --console-surface: var(--color-bezel);
-  --parchment: #e6e3dc;
+  --parchment: #e4e3e0;
   /* Vertical inset of the button GROUPS from the rail's top/bottom edges, so
      the groups clear the screen's rounded corners rather than running to its
      square bounding box. Was a small flat clamp (controls overshot the arc);
@@ -143,17 +160,17 @@ html.light {
 @property --color-canvas {
   syntax: "<color>";
   inherits: true;
-  initial-value: #050608;
+  initial-value: #060707;
 }
 @property --color-bezel {
   syntax: "<color>";
   inherits: true;
-  initial-value: #07090f;
+  initial-value: #090909;
 }
 @property --color-canvas-elevated {
   syntax: "<color>";
   inherits: true;
-  initial-value: #0a0a0c;
+  initial-value: #0a0a0b;
 }
 @property --color-ink {
   syntax: "<color>";
@@ -173,12 +190,12 @@ html.light {
 @property --color-hairline {
   syntax: "<color>";
   inherits: true;
-  initial-value: #1c1f24;
+  initial-value: #1e2022;
 }
 @property --color-hairline-hover {
   syntax: "<color>";
   inherits: true;
-  initial-value: #2c3038;
+  initial-value: #2e3034;
 }
 
 @layer base {
@@ -207,29 +224,29 @@ html.light {
     color-scheme: light;
     /* Paper bed → the readability fade lightens (not darkens) the type
        column in light mode. */
-    --readability-rgb: 245 242 236;
-    --color-canvas: #f5f2ec;
+    --readability-rgb: 243 242 240;
+    --color-canvas: #f3f2f0;
     /* Chassis a touch deeper than the paper canvas so the bezel reads as a
        framing surface around the screen, like the warm-grey body of a desk. */
-    --color-bezel: #e7e2d8;
+    --color-bezel: #e3e1dc;
     --color-canvas-elevated: #ffffff;
-    --color-ink: #1a1714;
-    --color-ink-muted: #6b6358;
-    --color-ink-faint: #b3a89a;
-    --color-hairline: #ddd6c8;
-    --color-hairline-hover: #c7bda9;
+    --color-ink: #181715;
+    --color-ink-muted: #67635d;
+    --color-ink-faint: #aeaaa3;
+    --color-hairline: #d8d6d0;
+    --color-hairline-hover: #c2bfb7;
 
     /* Console in light mode → brushed-aluminium desk. Same value LOGIC as
        dark (caps proud and a touch lighter than the panel, recesses darker,
        a lit top bevel) but inverted into a warm-grey metal so the chrome
        reads as a pale anodized surface rather than dark graphite. */
-    --console-panel: #dcd8cf; /* warm aluminium faceplate */
-    --console-panel-hi: #ece9e2; /* lit top edge */
-    --console-cap: #eae6dd; /* raised cap, lighter than the panel */
-    --console-cap-hi: #f6f3ec; /* cap's lit top bevel */
-    --console-recess: #c4bfb4; /* routed slot — darker than the panel */
-    --console-edge: #b0aa9d; /* contact shadow line */
-    --console-print: #7d766a; /* engraved legend ink */
+    --console-panel: #dad8d3; /* neutral aluminium faceplate */
+    --console-panel-hi: #eae9e6; /* lit top edge */
+    --console-cap: #e8e6e1; /* raised cap, lighter than the panel */
+    --console-cap-hi: #f4f3f0; /* cap's lit top bevel */
+    --console-recess: #c2c0ba; /* routed slot — darker than the panel */
+    --console-edge: #aeaca5; /* contact shadow line */
+    --console-print: #79766f; /* engraved legend ink */
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -248,7 +265,7 @@ html.light {
     /* Geist sans is the system. Fraunces is loaded but only used via
        .font-serif-italic for rare italic accents. */
     font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
-    font-weight: 400;
+    font-weight: var(--weight-body);
     font-feature-settings: "kern", "ss01", "ss03";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -280,33 +297,35 @@ html.light {
   /* Wordmark / display: Geist at very light weight, aggressive tracking. */
   .font-display {
     font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
-    font-weight: 200;
+    font-weight: var(--weight-display);
     letter-spacing: var(--tracking-tightest);
   }
   /* Headings: a notch heavier than display but still architectural. */
   .font-heading {
     font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
-    font-weight: 250;
+    font-weight: var(--weight-heading);
     letter-spacing: var(--tracking-tighter);
   }
   /* Body sans for paragraphs. */
   .font-body {
     font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
-    font-weight: 400;
+    font-weight: var(--weight-body);
     letter-spacing: -0.003em;
   }
   /* The ONE warm-serif accent: Fraunces italic, used inside body copy
      for emphasis. Lower opsz than the old display call so it sits at
-     body size without looking display-y. */
+     body size without looking display-y. Fraunces is a variable font, so
+     its weight is free (not limited to Geist's discrete cuts). */
   .font-serif-italic {
     font-family: var(--font-serif), ui-serif, Georgia, serif;
     font-style: italic;
-    font-weight: 300;
+    font-weight: var(--weight-body-emphasis);
     font-variation-settings: "opsz" 24, "SOFT" 50, "WONK" 0;
     letter-spacing: -0.005em;
   }
   .font-mono {
     font-family: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
+    font-weight: var(--weight-mono);
   }
   .text-balance {
     text-wrap: balance;
@@ -342,6 +361,7 @@ html.light {
      muted vs ink without fighting the utility. */
   .eyebrow {
     font-family: var(--font-mono), monospace;
+    font-weight: var(--weight-mono);
     font-size: var(--text-eyebrow);
     letter-spacing: var(--tracking-wide);
     text-transform: uppercase;

@@ -23,7 +23,7 @@ export const categories: { id: Category | "all"; label: string }[] = [
 export const projects: Project[] = [
   {
     id: "p-oskar",
-    title: "Oskar",
+    title: "OSKAR",
     client: "Verso Studios",
     role: "Tonmeister",
     category: "film",
@@ -40,7 +40,7 @@ export const projects: Project[] = [
   },
   {
     id: "p-last-knight",
-    title: "The Last Knight",
+    title: "THE LAST KNIGHT",
     client: "Verso Studios",
     role: "Tonmeister",
     category: "film",

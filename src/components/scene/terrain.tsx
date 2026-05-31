@@ -317,9 +317,9 @@ const fragmentShader = /* glsl */ `
     // Dark mode: cold white-blue, warming to gold only on loud beats.
     // Light mode: a warm near-black ink so the contours read as drawn
     // lines on paper; gold beat-tint still applies.
-    vec3 cool = vec3(0.867, 0.886, 0.918);   // #dde2ea genuinely cold
-    vec3 gold = vec3(0.722, 0.518, 0.361);   // #b8845c
-    vec3 inkLine = vec3(0.08, 0.06, 0.04);   // near-black warm ink for light
+    vec3 cool = vec3(0.889, 0.894, 0.902);   // #e3e4e6 — near-neutral, faintest cool
+    vec3 gold = vec3(0.600, 0.560, 0.510);   // #998f82 — desaturated warm grey
+    vec3 inkLine = vec3(0.07, 0.065, 0.058); // near-black neutral ink for light
     float goldMix = smoothstep(0.5, 0.8, uBass);
     vec3 darkLine = mix(cool, gold, goldMix);
     vec3 lightLine = mix(inkLine, gold, goldMix * 0.7);
