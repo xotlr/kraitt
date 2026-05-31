@@ -78,7 +78,7 @@
   --font-mono: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
 
   /* Type scale — tightened. Display is large but not overpowering.
-     Line-heights are taut (sans wants less leading than the old serif). */
+     Line-heights are taut. Mono wants less leading than a serif. */
   --text-display: clamp(3rem, 1.6rem + 6.2vw, 10rem);
   --text-display--line-height: 0.9;
   --text-h1: clamp(2rem, 1.3rem + 3vw, 4.75rem);
@@ -89,10 +89,15 @@
   --text-body-lg--line-height: 1.55;
   --text-eyebrow: 10.5px;
 
-  /* Sans wants tighter tracking at display sizes than the serif did. */
-  --tracking-tightest: -0.045em;
-  --tracking-tighter: -0.03em;
-  --tracking-tight: -0.018em;
+  /* Telemetry/instrument register: this is a MONOSPACE site (Apollo DSKY /
+     Death Stranding HUD), so tracking is NEUTRAL-to-POSITIVE, never negative.
+     The fixed-advance grid IS the look — crushing the cells with negative
+     tracking (the old sans-tuned -0.045em) collapsed the rhythm and read as a
+     squeezed terminal font. Display/headings sit at 0 so glyphs keep their
+     full cell; the wide tracks below carry the engraved-label feel. */
+  --tracking-tightest: 0em;
+  --tracking-tighter: 0em;
+  --tracking-tight: 0.005em;
   --tracking-eyebrow: 0.2em;
   --tracking-wide: 0.24em;
 
@@ -100,18 +105,17 @@
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* ── Type weight ladder ───────────────────────────────────────────────
-     One knob per role. Geist Mono is loaded at 400/500 ONLY, so these MUST be
-     400 or 500 or the browser faux-thins/-bolds the cut. Every font utility
-     below reads from these, so reweighting the whole site is editing this
-     block, nothing else. Hero/display shares --weight-display. NOTE: the site
-     is now Geist MONO everywhere, and the mono
-     cut is only loaded at 400/500 (see layout.tsx) — so these MUST be 400 or
-     500 or the browser faux-thins the mono, which reads cheap. Display sits at
-     400 (was 300 on the sans, which has no mono equivalent loaded). */
+     One knob per role. Geist Mono is loaded at 400/500 (see layout.tsx), so
+     these MUST be 400 or 500 or the browser faux-thins/-bolds the cut, which
+     reads cheap. Every font utility below reads from these, so reweighting the
+     whole site is editing this block, nothing else. Display sits at 400, NOT a
+     thin cut: a thin mono reads as fashion/editorial, but the instrument/
+     telemetry register wants a solid regular weight (Apollo + DS display type
+     is regular-to-medium, never hairline). */
   --weight-display: 400;
   --weight-heading: 400;
   --weight-body: 500;
-  --weight-body-emphasis: 400; /* the serif-italic accent inside body copy */
+  --weight-body-emphasis: 500; /* bracketed amber emphasis inside body copy */
   --weight-mono: 500;
 }
 
@@ -309,7 +313,9 @@ html.light {
 }
 
 @layer utilities {
-  /* Wordmark / display: Geist Mono, light cut, aggressive tracking. */
+  /* Wordmark / display: Geist Mono at regular weight, neutral mono tracking —
+     the full glyph cell, instrument-grade. No negative tracking (that crushed
+     the grid); --tracking-tightest is now 0. */
   .font-display {
     font-family: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
     font-weight: var(--weight-display);
@@ -321,23 +327,40 @@ html.light {
     font-weight: var(--weight-heading);
     letter-spacing: var(--tracking-tighter);
   }
-  /* Body mono for paragraphs. */
+  /* Body mono for paragraphs. Neutral tracking — mono reads cleanest at 0;
+     the old negative micro-track fought the fixed advance and gained nothing. */
   .font-body {
     font-family: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
     font-weight: var(--weight-body);
-    letter-spacing: -0.003em;
+    letter-spacing: 0;
   }
-  /* Emphasis accent — ONE typeface site (Geist Mono only). Emphasis is carried
-     by italic + the amber accent COLOUR (via .audio-accent), not by a second
-     typeface. */
+  /* Emphasis accent — telemetry/HUD grammar, NOT italic. The site is one
+     monospace family (Geist Mono), and a synthetic oblique on a font that
+     ships no true italic is the single most "off"-looking thing a mono site
+     can do (the browser shears the upright; spacing never adjusts). Apollo /
+     Death Stranding HUDs have no italics — emphasis is a BRACKETED amber
+     readout: the word warms to the accent colour, wrapped in faint [ ]
+     brackets that read as a tagged field rather than a stressed word. The
+     brackets are chrome (faint ink), so they frame without shouting inside
+     running prose; the word itself carries the colour (and the audio glow via
+     .audio-accent). Spaces inside the brackets are non-breaking so "[ film ]"
+     never wraps apart. */
   .text-accent {
     font-family: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
-    font-style: italic;
     font-weight: var(--weight-body-emphasis);
-    letter-spacing: -0.005em;
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+  .text-accent::before {
+    content: "[\00a0";
+    color: var(--color-ink-faint);
+  }
+  .text-accent::after {
+    content: "\00a0]";
+    color: var(--color-ink-faint);
   }
 
-  /* Audio-reactive accent — the Fraunces italic words. The warmth IS the
+  /* Audio-reactive accent — the bracketed amber words. The warmth IS the
      signal: amber + bloom mean SOUND, not "this is an accent". So at rest
      (silence) they fall back to neutral ink and carry NO glow — emphasis is
      held by italic alone — and they WARM UP the intensity ramp (cold blue →
@@ -364,6 +387,31 @@ html.light {
           transparent
         );
     transition: text-shadow 90ms linear, color 90ms linear;
+  }
+  /* Audio-reactive chromatic fringe — the hero WORDMARK only (large display
+     type). The terrain behind it splits into red/cyan under the scene's CA
+     post-pass; this gives "Sufian Kraitt" the same analog-signal signature so
+     the headline reads as coming off the same signal path. The trick that
+     keeps the EDGE crisp: this is NOT a blur and NOT a static offset. Two
+     hard-copy shadows (one warm-red shifted left, one cyan shifted right)
+     whose offset is ZERO at silence and widens with --audio-glow, capped well
+     under 1px (~0.7px peak). Sub-pixel = phase artifact (the wanted, audio
+     connotation); past a pixel it reads as a focus error, so it's clamped by
+     construction. At rest (silence, reduced-motion → glow pinned 0) the offset
+     is 0px: the wordmark is perfectly crisp, single-channel ink. Texture as
+     BEHAVIOUR — it only appears with the signal, like the meters.
+
+     Reserved for display size ONLY: at label size a sub-pixel R/C split is a
+     large fraction of the stroke and just looks broken (see the caution in the
+     .text-accent block — small mono stays clean). */
+  .wordmark-fringe {
+    --fringe: calc(var(--audio-glow, 0) * 0.7px);
+    text-shadow:
+      calc(var(--fringe) * -1) 0 0
+        rgba(255, 70, 70, calc(var(--audio-glow, 0) * 0.5)),
+      var(--fringe) 0 0
+        rgba(70, 210, 255, calc(var(--audio-glow, 0) * 0.5));
+    transition: text-shadow 90ms linear;
   }
   .font-mono {
     font-family: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;

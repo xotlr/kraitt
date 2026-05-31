@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { Accent } from "@/components/accent";
 import { SectionHeading } from "@/components/section-heading";
 import { useLanguage } from "@/lib/language-context";
 import { dict } from "@/lib/i18n";
@@ -14,8 +15,8 @@ const drawX = mkDrawX();
 export function Ueber() {
   const { lang } = useLanguage();
   const t = dict(lang).ueber;
-  // Drives --audio-tint/--audio-glow onto the prose block so the Fraunces
-  // italic accents inside it (p1Em / p2Em) warm with the music. The heading
+  // Drives --audio-tint/--audio-glow onto the prose block so the bracketed
+  // amber accents inside it (p1Em / p2Em) warm with the music. The heading
   // accent gets the same vars from SectionHeading's own ref.
   const proseRef = useAudioGlow<HTMLDivElement>();
   return (
@@ -30,7 +31,7 @@ export function Ueber() {
           title={
             <>
               {t.titleA}
-              <span className="text-accent audio-accent">{t.titleEm}</span>
+              <Accent>{t.titleEm}</Accent>
               {t.titleB}
             </>
           }
@@ -47,12 +48,12 @@ export function Ueber() {
           >
             <motion.p variants={fadeUp}>
               {t.p1a}
-              <span className="text-accent audio-accent">{t.p1Em}</span>
+              <Accent>{t.p1Em}</Accent>
               {t.p1b}
             </motion.p>
             <motion.p variants={fadeUp}>
               {t.p2a}
-              <span className="text-accent audio-accent">{t.p2Em}</span>
+              <Accent>{t.p2Em}</Accent>
               {t.p2b}
             </motion.p>
             <motion.p variants={fadeUp} className="text-ink-muted">

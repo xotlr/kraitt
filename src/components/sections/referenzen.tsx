@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useMemo, useState } from "react";
+import { Accent } from "@/components/accent";
 import { SectionHeading } from "@/components/section-heading";
 import {
   Dialog,
@@ -66,7 +67,7 @@ export function Referenzen() {
           title={
             <>
               {t.titleA}
-              <span className="text-accent audio-accent">{t.titleEm}</span>
+              <Accent>{t.titleEm}</Accent>
             </>
           }
         />

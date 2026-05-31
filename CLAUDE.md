@@ -22,8 +22,12 @@ post-processing stack. The scene is the brand.
 - **The scene is the brand; UI frames it, never competes.** If a UI
   element fights the scene for attention (thick borders, heavy buttons,
   busy illustrations), the element is wrong.
-- **Fraunces at weight 200–300.** Heavier muddies the warm peaks.
-- **One accent color (amber)** — italic accents and shader peaks only.
+- **Typography is open.** No prescribed typeface, weight, or pairing — the
+  type system is whatever best serves the cinematic, type-led identity, and
+  is free to change. The current state lives in `src/app/globals.css`
+  (`@theme` font/weight/scale tokens) and `src/app/layout.tsx` (loaded
+  font + cuts); treat that code as the source of truth, not this doc.
+- **One accent color (amber)** — emphasis accents and shader peaks only.
 - **Hairline dividers, not solid blocks.**
 - **No images, no icons in section content.** The console chrome is the
   deliberate exception: rails use Phosphor icons

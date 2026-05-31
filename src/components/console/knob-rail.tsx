@@ -62,16 +62,24 @@ export function KnobRail() {
     >
       {/* TOP — brand plate + audio transport directly beneath it. */}
       <div className="flex flex-col items-center gap-3">
-        {/* Brand plate — the wordmark, the desk's name tag. Same recessed
+        {/* Brand plate — the desk's name tag, INVERTED so it reads as a
+            stamped nameplate rather than dim engraving. The plate is filled
+            with ink and the "sk" is KNOCKED OUT to the chassis surface, so in
+            dark mode it's a pale chip with dark letters and in light mode a
+            dark chip with pale letters — maximum pop, and it flips with the
+            theme for free since both are tokens. Sits in the same recessed
             pill as the clusters; links home. */}
         <motion.div variants={item} className="console-group">
           <a
             href="#hero"
             onClick={scrollTo("hero")}
-            className="flex items-center justify-center font-display text-sm leading-none text-ink-muted hover:text-ink transition-colors"
+            aria-label="Sufian Kraitt — zum Anfang"
+            className="group/sk flex items-center justify-center rounded-[var(--console-cap-radius,7px)] bg-ink text-canvas transition-[filter] duration-300 hover:brightness-110"
             style={{ width: "var(--console-unit)", height: "var(--console-unit)" }}
           >
-            sk
+            <span className="font-display text-sm leading-none lowercase">
+              sk
+            </span>
           </a>
         </motion.div>
 

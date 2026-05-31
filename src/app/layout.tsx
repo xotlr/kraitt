@@ -14,15 +14,17 @@ import { ThemeProvider } from "@/lib/theme-context";
 import "./globals.css";
 
 // "Ghost mono": ONE typeface site-wide. Geist Mono carries everything —
-// display, headings, body, accents. The old Geist sans was dropped (the whole
-// site moved to mono), so there's a single family loaded. Weights 300/400/500;
-// the type weight ladder in globals.css must stay on these cuts or the browser
-// faux-thins/-bolds the mono. 300 is the light cut used by the hero wordmark.
+// display, headings, body, accents — in the telemetry/instrument register
+// (Apollo DSKY / Death Stranding HUD). The old Geist sans was dropped, so a
+// single family is loaded. Weights 400/500 ONLY: the type weight ladder in
+// globals.css must stay on these two cuts or the browser faux-thins/-bolds the
+// mono, which reads cheap. The 300 cut was removed when the hero wordmark went
+// from hairline to regular (a thin mono reads fashion, not engineered).
 // Keep in sync with --weight-* there.
 const geistMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
-  weight: ["300", "400", "500"],
+  weight: ["400", "500"],
   display: "swap",
 });
 

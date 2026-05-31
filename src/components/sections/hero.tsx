@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { Accent } from "@/components/accent";
 import { useScrollTo } from "@/lib/scroll-context";
 import { useAudioGlow } from "@/hooks/use-audio-glow";
 import { useLanguage } from "@/lib/language-context";
@@ -9,17 +10,24 @@ import { dict } from "@/lib/i18n";
 // The hero has NO load-in animation — it renders static (the user asked to
 // drop the slide/fade reveals). The only motion left is the dot's hover.
 //
-// The audio tint/glow lives on the Fraunces accents (the .audio-accent class
-// in globals.css), not the sans wordmark. useAudioGlow writes --audio-tint /
-// --audio-glow onto the intro paragraph so the italic accents inside it warm
-// and bloom with the music while the display wordmark stays neutral ink.
+// The audio tint/glow lives on the bracketed amber accents (the .audio-accent
+// class in globals.css), not the wordmark. useAudioGlow writes --audio-tint /
+// --audio-glow onto the intro paragraph so the [ bracketed ] accents inside it
+// warm and bloom with the music while the display wordmark stays neutral ink.
 
 export function Hero() {
   const scrollTo = useScrollTo();
-  // Audio tint now lives on the Fraunces accents in the body line (Film /
-  // television / music), not the sans wordmark. The ref goes on that
-  // paragraph so its .audio-accent spans inherit --audio-tint / --audio-glow.
+  // Audio tint lives on the bracketed amber accents in the body line
+  // ([ film ] / [ television ] / [ music ]), not the wordmark. The ref goes on
+  // that paragraph so its .audio-accent spans inherit --audio-tint / --audio-glow.
   const introRef = useAudioGlow<HTMLParagraphElement>();
+  // The wordmark carries its OWN audio-glow write so the chromatic fringe
+  // (.wordmark-fringe in globals.css) widens its red/cyan split with the beat —
+  // texture as behaviour, sharing the meters' signal path. Separate ref from
+  // the intro paragraph because --audio-glow must land on the <h1> itself for
+  // the fringe's text-shadow to read it; at silence the hook pins it to 0 so
+  // the wordmark stays a perfectly crisp single ink channel.
+  const wordmarkRef = useAudioGlow<HTMLHeadingElement>();
   const { lang } = useLanguage();
   const t = dict(lang).hero;
   return (
@@ -40,12 +48,17 @@ export function Hero() {
             family name. The accessible name is on the <h1>; the spans are
             aria-hidden. */}
         <h1
+          ref={wordmarkRef}
           aria-label="Sufian Kraitt"
-          // Lighter cut (300) + a touch more open tracking than the shared
-          // .font-display tightest, so the wordmark reads airier without
-          // changing the email block / nav which also use .font-display.
-          style={{ fontWeight: 300, letterSpacing: "-0.02em" }}
-          className="font-display text-display leading-[var(--text-display--line-height)] text-balance text-legible text-ink"
+          // Seed --audio-glow so the fringe has a defined resting value (0px
+          // offset = crisp) before the first rAF write.
+          style={{ ["--audio-glow" as string]: 0 }}
+          // Regular weight (400), neutral mono tracking. A thin cut read as
+          // fashion/editorial; the instrument register (Apollo / DS) wants the
+          // wordmark solid and on the mono grid, not hairline. Inherits
+          // .font-display's weight + tracking now, so no per-element override.
+          // .wordmark-fringe adds the audio-reactive red/cyan chromatic split.
+          className="wordmark-fringe font-display text-display leading-[var(--text-display--line-height)] text-balance text-legible text-ink"
         >
           <span className="block" aria-hidden>
             Sufian
@@ -72,10 +85,10 @@ export function Hero() {
           className="mt-12 md:mt-16 max-w-[50ch] text-body-lg leading-[var(--text-body-lg--line-height)] text-ink/80 font-body text-legible"
         >
           {t.leadIn}
-          <span className="text-accent audio-accent">{t.film}</span>,{" "}
-          <span className="text-accent audio-accent">{t.television}</span>
+          <Accent>{t.film}</Accent>,{" "}
+          <Accent>{t.television}</Accent>
           {lang === "de" ? " und " : ", "}
-          <span className="text-accent audio-accent">{t.music}</span>
+          <Accent>{t.music}</Accent>
           {t.leadOut}
         </p>
       </div>

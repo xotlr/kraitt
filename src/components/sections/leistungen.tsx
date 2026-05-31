@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { Accent } from "@/components/accent";
 import { SectionHeading } from "@/components/section-heading";
 import { useLanguage } from "@/lib/language-context";
 import { dict } from "@/lib/i18n";
@@ -27,7 +28,7 @@ export function Leistungen() {
           title={
             <>
               {t.titleA}
-              <span className="text-accent audio-accent">{t.titleEm}</span>
+              <Accent>{t.titleEm}</Accent>
               {t.titleB}
             </>
           }

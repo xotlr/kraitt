@@ -7,10 +7,10 @@ import { drawX, fadeUp, makeStagger } from "@/lib/motion";
 
 // The heading itself stays NEUTRAL ink. useAudioGlow still writes
 // --audio-tint / --audio-glow onto this <h2> each frame, but the heading no
-// longer consumes them — instead the vars INHERIT down to the Fraunces
-// italic accent inside the title (the .audio-accent span), which is the
-// element that now warms and blooms with the music. Seeding --audio-glow: 0
-// here gives the accent a defined resting value before the first rAF write.
+// longer consumes them — instead the vars INHERIT down to the bracketed amber
+// accent inside the title (the .audio-accent span), which is the element that
+// now warms and blooms with the music. Seeding --audio-glow: 0 here gives the
+// accent a defined resting value before the first rAF write.
 const audioVarSeed: React.CSSProperties = {
   // @ts-expect-error — custom property, valid CSS, not in the TS type
   "--audio-glow": 0,
@@ -44,7 +44,14 @@ export function SectionHeading({
       viewport={{ once: true, margin: "-12%" }}
       className={cn("mb-16 md:mb-28", className)}
     >
-      <div className="flex items-baseline gap-4 md:gap-6 mb-8 md:mb-10 eyebrow">
+      {/* Telemetry field header: "// NN ———— LABEL". The // marks the line as a
+          logged field (HUD/source-comment grammar), the index is the channel
+          number, the hairline is the readout track, the label is the field
+          name. The // sits in faint ink so it reads as a marker, not content. */}
+      <div className="flex items-baseline gap-3 md:gap-4 mb-8 md:mb-10 eyebrow">
+        <motion.span variants={headingFade} className="text-ink-faint">
+          //
+        </motion.span>
         <motion.span variants={headingFade} className="text-ink">
           {index}
         </motion.span>
