@@ -30,6 +30,10 @@ export function PageScroll({ children }: { children: ReactNode }) {
   return (
     <ScrollArea
       className="absolute inset-0 z-10 h-full"
+      // Hide the native scrollbar — the ScrollGauge rulers are the affordance.
+      // A hidden Radix ScrollBar is kept mounted in ScrollArea so the viewport
+      // stays overflow:scroll (wheel works); this just suppresses the OS bar.
+      viewportClassName="no-native-scrollbar"
       viewportRef={viewportRef}
     >
       {children}

@@ -83,19 +83,11 @@ export function VuMeter() {
   return (
     <div
       aria-hidden
-      className="relative w-full overflow-hidden rounded-[6px]"
-      style={{
-        aspectRatio: "1.15 / 1",
-        // Dark recessed window — same routed-black surface as the meter, so
-        // the dial belongs to the same instrument.
-        background:
-          "linear-gradient(180deg, color-mix(in srgb, var(--console-recess) 70%, black), var(--console-recess))",
-        boxShadow: [
-          "inset 0 0 0 1px color-mix(in srgb, black 55%, transparent)",
-          "inset 0 2px 4px color-mix(in srgb, black 65%, transparent)",
-          "inset 0 -1px 0 color-mix(in srgb, white 4%, transparent)",
-        ].join(","),
-      }}
+      // Recessed window shared with the EQ bars (.console-recess-window). It
+      // theme-softens in light mode so the dial isn't a near-black well with a
+      // hard border against the pale desk.
+      className="console-recess-window relative w-full overflow-hidden rounded-[6px]"
+      style={{ aspectRatio: "1.15 / 1" }}
     >
       <svg
         viewBox="0 0 100 60"

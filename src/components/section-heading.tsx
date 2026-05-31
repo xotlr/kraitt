@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useAudioGlow } from "@/hooks/use-audio-glow";
-import { drawX, fadeUp, makeStagger, maskUp } from "@/lib/motion";
+import { drawX, fadeUp, makeStagger } from "@/lib/motion";
 
 // The heading itself stays NEUTRAL ink. useAudioGlow still writes
 // --audio-tint / --audio-glow onto this <h2> each frame, but the heading no
@@ -19,8 +19,10 @@ const audioVarSeed: React.CSSProperties = {
 const container = makeStagger(0.12, 0.05);
 const headingFade = fadeUp(12);
 const headingDraw = drawX(1.1);
-// Title masks in from below using a clip-path inset.
-const titleReveal = maskUp(18, 1.15);
+// Title fades + rises in. No clip-path swipe — the inset() mask cropped the
+// last glyph line of taller mono titles (descenders / multi-line), so the
+// reveal is a plain fadeUp and the overflow-hidden wrapper is gone.
+const titleReveal = fadeUp(18, 1.15);
 
 export function SectionHeading({
   index,
@@ -53,16 +55,14 @@ export function SectionHeading({
         />
         <motion.span variants={headingFade}>{label}</motion.span>
       </div>
-      <div className="overflow-hidden pb-[0.15em]">
-        <motion.h2
-          ref={titleRef}
-          variants={titleReveal}
-          style={audioVarSeed}
-          className="font-heading text-h1 leading-[var(--text-h1--line-height)] max-w-[18ch] text-balance text-legible text-ink"
-        >
-          {title}
-        </motion.h2>
-      </div>
+      <motion.h2
+        ref={titleRef}
+        variants={titleReveal}
+        style={audioVarSeed}
+        className="font-heading text-h1 leading-[var(--text-h1--line-height)] max-w-[18ch] text-balance text-legible text-ink"
+      >
+        {title}
+      </motion.h2>
     </motion.div>
   );
 }

@@ -41,6 +41,10 @@ export function Hero() {
             aria-hidden. */}
         <h1
           aria-label="Sufian Kraitt"
+          // Lighter cut (300) + a touch more open tracking than the shared
+          // .font-display tightest, so the wordmark reads airier without
+          // changing the email block / nav which also use .font-display.
+          style={{ fontWeight: 300, letterSpacing: "-0.02em" }}
           className="font-display text-display leading-[var(--text-display--line-height)] text-balance text-legible text-ink"
         >
           <span className="block" aria-hidden>

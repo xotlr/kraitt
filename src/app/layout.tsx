@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
 import { Island } from "@/components/island";
 import { GrainOverlay } from "@/components/grain-overlay";
 import { ConsolePanel } from "@/components/console/console-panel";
@@ -13,20 +13,16 @@ import { ScrollProvider } from "@/lib/scroll-context";
 import { ThemeProvider } from "@/lib/theme-context";
 import "./globals.css";
 
-const geist = Geist({
-  subsets: ["latin"],
-  variable: "--font-display",
-  weight: ["200", "300", "400", "500"],
-  display: "swap",
-});
-
+// "Ghost mono": ONE typeface site-wide. Geist Mono carries everything —
+// display, headings, body, accents. The old Geist sans was dropped (the whole
+// site moved to mono), so there's a single family loaded. Weights 300/400/500;
+// the type weight ladder in globals.css must stay on these cuts or the browser
+// faux-thins/-bolds the mono. 300 is the light cut used by the hero wordmark.
+// Keep in sync with --weight-* there.
 const geistMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
-  // 400 (default mono) + 500 — the type weight ladder bumped mono/eyebrow
-  // to --weight-mono: 500, which needs the real cut loaded or the browser
-  // synthesizes a faux-bold. Keep in sync with --weight-mono in globals.css.
-  weight: ["400", "500"],
+  weight: ["300", "400", "500"],
   display: "swap",
 });
 
@@ -43,7 +39,7 @@ export default function RootLayout({
     <html
       lang="de"
       suppressHydrationWarning
-      className={`${geist.variable} ${geistMono.variable}`}
+      className={geistMono.variable}
     >
       <head>
         {/* Set the theme class before first paint so there's no dark→light

@@ -25,14 +25,3 @@ export const makeStagger = (children = 0.08, delay = 0.05): Variants => ({
   hidden: {},
   visible: { transition: { staggerChildren: children, delayChildren: delay } },
 });
-
-/** Masks in from below via a clip-path inset (titles, the email block). */
-export const maskUp = (y = 18, duration = 1.15): Variants => ({
-  hidden: { clipPath: "inset(0% 0% 100% 0%)", y, opacity: 0 },
-  visible: {
-    clipPath: "inset(0% 0% 0% 0%)",
-    y: 0,
-    opacity: 1,
-    transition: { duration, ease: EASE, opacity: { duration: 0.6, ease: EASE } },
-  },
-});

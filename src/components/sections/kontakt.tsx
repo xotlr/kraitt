@@ -8,13 +8,14 @@ import {
   drawX as mkDrawX,
   fadeUp as mkFadeUp,
   makeStagger,
-  maskUp,
 } from "@/lib/motion";
 
 const stagger = makeStagger(0.08, 0.05);
 const fadeUp = mkFadeUp(18);
 const drawX = mkDrawX(1);
-const emailReveal = maskUp(14, 1.1);
+// Fade + rise, no clip-path swipe — the inset() mask clipped the email's
+// descenders (the @ and the 'j' in sufian) at large mono sizes.
+const emailReveal = mkFadeUp(14, 1.1);
 
 const email = "hello@sufiankraitt.com";
 
@@ -53,14 +54,12 @@ export function Kontakt() {
           viewport={{ once: true, margin: "-10%" }}
           className="group block py-12 md:py-20"
         >
-          <span className="block overflow-hidden pb-[0.1em]">
-            <motion.span
-              variants={emailReveal}
-              className="font-display block text-[clamp(2.25rem,8vw,7.5rem)] leading-[0.95] text-balance text-ink/85 group-hover:text-ink transition-colors duration-700"
-            >
-              {email}
-            </motion.span>
-          </span>
+          <motion.span
+            variants={emailReveal}
+            className="font-display block pb-[0.1em] text-[clamp(2.25rem,8vw,7.5rem)] leading-[0.95] text-balance text-ink/85 group-hover:text-ink transition-colors duration-700"
+          >
+            {email}
+          </motion.span>
           <motion.span
             variants={fadeUp}
             className="mt-8 inline-flex items-center gap-3 eyebrow text-ink-muted"

@@ -71,7 +71,10 @@
      Neutral grey, low-contrast like real panel print, never pure white. */
   --console-print: #74757a;
 
-  --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  /* "Ghost mono": ONE typeface site-wide is Geist Mono. The display token now
+     aliases the mono family too, so any Tailwind `font-display` utility also
+     resolves to mono and there's no second family loaded anywhere. */
+  --font-display: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
   --font-mono: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
 
   /* Type scale — tightened. Display is large but not overpowering.
@@ -97,15 +100,15 @@
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* ── Type weight ladder ───────────────────────────────────────────────
-     One knob per role. Geist is loaded at discrete cuts (200/300/400/500),
-     so these MUST be values that exist or the browser snaps anyway. Bumped
-     up a rung across the board — the old ladder (display 200, heading 250,
-     mono unset→400) read thin/cheap. Every font utility below reads from
-     these, so reweighting the whole site is editing this block, nothing
-     else. Hero/display shares --weight-display (intentionally heavier than
-     the CLAUDE.md "200–300" note — deliberate, the wordmark was too wispy
-     over the scene). */
-  --weight-display: 300;
+     One knob per role. Geist Mono is loaded at 400/500 ONLY, so these MUST be
+     400 or 500 or the browser faux-thins/-bolds the cut. Every font utility
+     below reads from these, so reweighting the whole site is editing this
+     block, nothing else. Hero/display shares --weight-display. NOTE: the site
+     is now Geist MONO everywhere, and the mono
+     cut is only loaded at 400/500 (see layout.tsx) — so these MUST be 400 or
+     500 or the browser faux-thins the mono, which reads cheap. Display sits at
+     400 (was 300 on the sans, which has no mono equivalent loaded). */
+  --weight-display: 400;
   --weight-heading: 400;
   --weight-body: 500;
   --weight-body-emphasis: 400; /* the serif-italic accent inside body copy */
@@ -273,9 +276,10 @@ html.light {
   html,
   body {
     color: var(--color-ink);
-    /* ONE typeface: Geist sans, system-wide. Emphasis is italic + the amber
-       accent colour, not a second family. */
-    font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+    /* ONE typeface: Geist MONO, system-wide ("ghost mono"). The whole site is
+       monospace now — display, headings, body, accents. Emphasis is italic +
+       the amber accent colour, not a second family. */
+    font-family: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
     font-weight: var(--weight-body);
     font-feature-settings: "kern", "ss01", "ss03";
     -webkit-font-smoothing: antialiased;
@@ -305,45 +309,47 @@ html.light {
 }
 
 @layer utilities {
-  /* Wordmark / display: Geist at very light weight, aggressive tracking. */
+  /* Wordmark / display: Geist Mono, light cut, aggressive tracking. */
   .font-display {
-    font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
     font-weight: var(--weight-display);
     letter-spacing: var(--tracking-tightest);
   }
   /* Headings: a notch heavier than display but still architectural. */
   .font-heading {
-    font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
     font-weight: var(--weight-heading);
     letter-spacing: var(--tracking-tighter);
   }
-  /* Body sans for paragraphs. */
+  /* Body mono for paragraphs. */
   .font-body {
-    font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
     font-weight: var(--weight-body);
     letter-spacing: -0.003em;
   }
-  /* Emphasis accent — ONE typeface site (Geist only, no serif). Emphasis is
-     carried by italic + the amber accent COLOUR (via .audio-accent), not by a
-     second typeface. */
+  /* Emphasis accent — ONE typeface site (Geist Mono only). Emphasis is carried
+     by italic + the amber accent COLOUR (via .audio-accent), not by a second
+     typeface. */
   .text-accent {
-    font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
     font-style: italic;
     font-weight: var(--weight-body-emphasis);
     letter-spacing: -0.005em;
   }
 
-  /* Audio-reactive accent — the Fraunces italic words, the ONE warm element.
-     At rest they sit at --color-accent (amber), so the accent identity is
-     always present on a silent page (previously they fell back to --color-ink
-     and were indistinguishable from body text — just italic — which read as an
-     accidental font switch). When audio plays, --audio-tint overrides toward
-     the live intensity ramp (cold blue → up to the same gold), and the bloom
-     rises off --audio-glow. The vars are written by useAudioGlow onto the
-     nearest heading/prose ancestor and INHERIT down to this span. Short
-     transitions ease the colour/glow with the beat. */
+  /* Audio-reactive accent — the Fraunces italic words. The warmth IS the
+     signal: amber + bloom mean SOUND, not "this is an accent". So at rest
+     (silence) they fall back to neutral ink and carry NO glow — emphasis is
+     held by italic alone — and they WARM UP the intensity ramp (cold blue →
+     silver → gold) only as audio plays, the bloom rising off --audio-glow.
+     (Earlier this was inverted: the silent fallback was --color-accent, so a
+     dead-quiet page glowed full amber and the words went COLDER when the music
+     started. Now amber/glow appear with the signal, not in its absence.)
+     The vars are written by useAudioGlow onto the nearest heading/prose
+     ancestor and INHERIT down to this span. Short transitions ease the
+     colour/glow with the beat. */
   .audio-accent {
-    color: var(--audio-tint, var(--color-accent));
+    color: var(--audio-tint, var(--color-ink));
     text-shadow:
       0 0 calc(1px + var(--audio-glow, 0) * 5px)
         color-mix(
@@ -383,6 +389,17 @@ html.light {
     max-width: var(--container-max);
     margin-inline: auto;
     width: 100%;
+  }
+
+  /* Hides the native OS scrollbar on the scroll viewport — the ScrollGauge
+     rulers are the visible affordance. The viewport stays wheel-scrollable
+     because a (visually hidden) Radix ScrollBar is kept mounted, which is what
+     makes Radix set overflow:scroll on the viewport. */
+  .no-native-scrollbar {
+    scrollbar-width: none; /* Firefox */
+  }
+  .no-native-scrollbar::-webkit-scrollbar {
+    display: none; /* WebKit/Blink */
   }
 
   .hairline {
@@ -488,20 +505,122 @@ html.light {
        flat tint — over the dark bezel the old flat 14% mix was nearly
        invisible, so the left metering strip's housing now reads as a defined
        recess the instrument is seated in. */
+    /* Darkening amounts are tokens so light mode can soften them (see the
+       html.light override below) — the pill is too heavy on parchment at the
+       dark-tuned values, so light mode drops the fill + border darkening. */
+    --pill-fill-top: 30%;
+    --pill-fill-bot: 22%;
+    --pill-shadow-1: 40%;
+    --pill-shadow-2: 30%;
+    --pill-border: 26%;
     background: linear-gradient(
       180deg,
-      color-mix(in srgb, black 30%, var(--console-surface)) 0%,
-      color-mix(in srgb, black 22%, var(--console-surface)) 100%
+      color-mix(in srgb, black var(--pill-fill-top), var(--console-surface)) 0%,
+      color-mix(in srgb, black var(--pill-fill-bot), var(--console-surface)) 100%
     );
     /* A shallow inset well: a deeper inner top shadow = the trough's own cast
        shadow, a hairline edge picks up the key light at the lip, faint bottom
        lift so it sits in the surface. Pushed up from barely-there so the recess
        is clearly defined without turning into a competing surface. */
     box-shadow:
-      inset 0 2px 5px color-mix(in srgb, black 40%, transparent),
-      inset 0 1px 1px color-mix(in srgb, black 30%, transparent),
-      inset 0 0 0 1px color-mix(in srgb, black 26%, transparent),
+      inset 0 2px 5px color-mix(in srgb, black var(--pill-shadow-1), transparent),
+      inset 0 1px 1px color-mix(in srgb, black var(--pill-shadow-2), transparent),
+      inset 0 0 0 1px color-mix(in srgb, black var(--pill-border), transparent),
       0 1px 0 color-mix(in srgb, white 6%, transparent);
+  }
+  /* Light mode: lighter navpill — less fill darkening so the trough reads as a
+     soft recess in the parchment rather than a grey panel, and lighter borders. */
+  html.light .console-group {
+    --pill-fill-top: 9%;
+    --pill-fill-bot: 5%;
+    --pill-shadow-1: 14%;
+    --pill-shadow-2: 9%;
+    --pill-border: 11%;
+  }
+
+  /* ── Recessed meter window (VU dial + EQ bars) ────────────────────────
+     The dark routed window the VU needle and the EQ bars sit in. Built off
+     --console-recess (a tone darker than the panel) with a soft top-darkening
+     gradient + an inset border, so the display reads as sunk into the desk.
+     The darkening is tokenised so LIGHT MODE can soften it: at the dark-tuned
+     values the window was near-black against the pale aluminium and its border
+     was a hard black line that fought the (now lighter) navpills. Light mode
+     drops the black-mix toward the recess tone and lightens the border, so the
+     window matches the navpill's quiet recess. Consumed by vu-meter.tsx +
+     spectrum-eq.tsx. */
+  .console-recess-window {
+    --win-fill-top: 30%; /* black mixed into recess at the top edge */
+    --win-border: 55%; /* inset hairline darkness */
+    --win-shadow: 65%; /* inner cast shadow darkness */
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, black var(--win-fill-top), var(--console-recess)),
+      var(--console-recess)
+    );
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, black var(--win-border), transparent),
+      inset 0 2px 4px color-mix(in srgb, black var(--win-shadow), transparent),
+      inset 0 -1px 0 color-mix(in srgb, white 4%, transparent);
+  }
+  html.light .console-recess-window {
+    /* Lighter window: the recess tone itself reads as the floor, the top edge
+       only a touch deeper, and a soft grey border instead of a black line. */
+    --win-fill-top: 8%;
+    --win-border: 16%;
+    --win-shadow: 18%;
+  }
+
+  /* ── Console scroll gauge (numeric ruler) ─────────────────────────────
+     The scroll affordance is a numeric measurement RULER on each side of the
+     screen — fixed 00–100 graduations, engraved in --console-print, with a
+     live readout that rides to the current scroll %. The numbers + major
+     ticks are real DOM (ScrollGauge); this class supplies the fine MINOR
+     ticks between numbers as a transparent background, so the scale floats
+     over the content as part of the screen. Two minor-tick scales (one each
+     edge) so the gauge reads two-sided. Consumed by console/scroll-gauge.tsx. */
+  .console-gauge-ticks {
+    --tick-step: 9px;
+    --tick-ink: color-mix(in srgb, var(--console-print) 75%, transparent);
+    background:
+      repeating-linear-gradient(
+        180deg,
+        var(--tick-ink) 0,
+        var(--tick-ink) 1px,
+        transparent 1px,
+        transparent var(--tick-step)
+      ),
+      repeating-linear-gradient(
+        180deg,
+        var(--tick-ink) 0,
+        var(--tick-ink) 1px,
+        transparent 1px,
+        transparent var(--tick-step)
+      );
+    background-size: 4px var(--tick-step), 4px var(--tick-step);
+    background-position: left center, right center;
+    background-repeat: repeat-y, repeat-y;
+  }
+
+  /* The live readout chip — the value handle on the right ruler. A small
+     machined plate carrying the current % number; lit top bevel, contact
+     shadow, so it reads as the grabbable indicator riding the scale. */
+  .console-gauge-readout {
+    border-radius: 3px;
+    background: linear-gradient(
+      180deg,
+      var(--console-cap-hi) 0%,
+      var(--console-cap) 55%,
+      color-mix(in srgb, black 14%, var(--console-cap)) 100%
+    );
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, white 16%, transparent),
+      inset 0 0 0 1px color-mix(in srgb, black 24%, transparent),
+      0 1px 3px color-mix(in srgb, var(--console-edge) 75%, transparent);
+    transition: filter 200ms ease;
+  }
+  .cursor-ns-resize:hover .console-gauge-readout,
+  .cursor-ns-resize:active .console-gauge-readout {
+    filter: brightness(1.14);
   }
 
 }

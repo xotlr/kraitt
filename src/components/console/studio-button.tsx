@@ -37,6 +37,13 @@ const TONE_COLOR: Record<ButtonTone, string> = {
   rec: "#e0524e", // red — mic / record-armed (kept: signal convention)
 };
 
+// The COLD low end of the desk's intensity ramp (utils INTENSITY_RAMP[0]).
+// Ramping tones (nav/play) rest HERE in silence and only warm toward their
+// gold/green tone as audio drives --audio-tint. So an active-but-silent button
+// reads cold + seated, never pre-lit amber — the warmth is the signal, not the
+// resting state. (rec never ramps; it stays its semantic red.)
+const RAMP_LOW = "#52617f";
+
 export function StudioButton({
   label,
   active = false,
@@ -92,10 +99,11 @@ export function StudioButton({
   // latch=false) keep their static tone so they don't go cold/"off"-looking in
   // silence. rec stays semantic red either way.
   const rampsWithIntensity = tone !== "rec" && latch;
-  // The active icon/LED colour: ramped tones read the live tint (falling back
-  // to the tone's own colour before the first audio frame); rec is fixed.
+  // The active icon/LED colour: ramped tones read the live tint and REST at the
+  // cold low end of the ramp in silence (not their gold/green tone) — so the
+  // warmth only appears with audio. rec is fixed at its semantic red.
   const activeColor = rampsWithIntensity
-    ? `var(--audio-tint, ${toneColor})`
+    ? `var(--audio-tint, ${RAMP_LOW})`
     : toneColor;
   const glowRef = useAudioGlow<HTMLSpanElement>();
   return (
@@ -220,13 +228,16 @@ export function StudioButton({
           style={
             {
               // --audio-glow / --audio-tint inherit from the parent span (which
-              // carries the useAudioGlow ref). Active glow = a steady base bloom
-              // PLUS a beat-driven bloom whose radius + opacity scale with
-              // --audio-glow, so the lit icon pulses on the beat. The bloom
-              // colour tracks the icon colour (ramped tint for nav/play, tone
-              // for rec). Idle: no filter; hover: static bloom.
+              // carries the useAudioGlow ref). The bloom IS the audio signal:
+              // for ramping tones it scales entirely off --audio-glow, so an
+              // active-but-silent button reads cold + seated with NO halo and
+              // only blooms (and warms toward gold) as the beat drives it. rec
+              // keeps a steady base bloom since it never ramps — an armed input
+              // must read "lit" even in silence. Idle: no filter; hover: static.
               filter: active
-                ? `drop-shadow(0 0 2px color-mix(in srgb, ${activeColor} 60%, transparent)) drop-shadow(0 0 calc(4px + var(--audio-glow) * 7px) color-mix(in srgb, ${activeColor} calc(45% + var(--audio-glow) * 45%), transparent))`
+                ? rampsWithIntensity
+                  ? `drop-shadow(0 0 calc(var(--audio-glow) * 3px) color-mix(in srgb, ${activeColor} calc(var(--audio-glow) * 60%), transparent)) drop-shadow(0 0 calc(var(--audio-glow) * 9px) color-mix(in srgb, ${activeColor} calc(var(--audio-glow) * 55%), transparent))`
+                  : `drop-shadow(0 0 2px color-mix(in srgb, ${activeColor} 60%, transparent)) drop-shadow(0 0 calc(4px + var(--audio-glow) * 7px) color-mix(in srgb, ${activeColor} calc(45% + var(--audio-glow) * 45%), transparent))`
                 : undefined,
               "--icon-glow-hover": `drop-shadow(0 0 4px color-mix(in srgb, ${toneColor} 45%, transparent))`,
             } as React.CSSProperties

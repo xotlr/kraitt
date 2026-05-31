@@ -2,6 +2,7 @@
 
 import { useAudioGlow } from "@/hooks/use-audio-glow";
 import { GrainOverlay } from "@/components/grain-overlay";
+import { ScrollGauge } from "@/components/console/scroll-gauge";
 
 /**
  * Island — the monitor bezel.
@@ -61,6 +62,13 @@ export function Island({ children }: { children: React.ReactNode }) {
           <GrainOverlay position="absolute" amount={0.16} />
           {/* children render <Scene/> (z-0) then the scroll content (z-10). */}
           {children}
+          {/* Numeric measurement rulers framing the screen. Both carry the
+              same fixed 00–100 scale and track live scroll %, so they read as
+              ONE instrument: the RIGHT is the draggable scrubber (the value
+              handle you grab), the LEFT mirrors its position passively. They
+              share inset-y-5 so the scales align row-for-row. */}
+          <ScrollGauge side="left" />
+          <ScrollGauge side="right" draggable />
         </div>
 
         {/*

@@ -5,15 +5,16 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Shadcn-style ScrollArea built on Radix. Styled to match the site's
- * monochrome system: hairline-thin track, ink-faint thumb that lifts on
- * hover. The track is invisible until needed (auto type), so quiet pages
- * don't carry visual scrollbar noise.
+ * Shadcn-style ScrollArea built on Radix. The VISIBLE scrollbar is NOT
+ * rendered here — the console's numeric measurement rulers (ScrollGauge,
+ * mounted in the island) are the scroll affordance: they show position and
+ * the right one scrubs. This component keeps the Radix Root/Viewport purely
+ * for scroll mechanics (native wheel/keys, hidden native bars) and to expose
+ * the viewport ref the shader / nav observer / gauges read from.
  *
  * Forwarding the viewport ref is non-trivial: Radix doesn't expose it on
  * Root, so we accept a `viewportRef` prop and forward it onto the
- * Viewport element. Consumers that drive scroll-linked behavior (the
- * shader, the nav observer) need this ref.
+ * Viewport element.
  */
 const ScrollArea = React.forwardRef<
   React.ElementRef<typeof ScrollAreaPrimitive.Root>,
@@ -33,38 +34,18 @@ const ScrollArea = React.forwardRef<
     >
       {children}
     </ScrollAreaPrimitive.Viewport>
-    <ScrollBar />
-    <ScrollAreaPrimitive.Corner />
+    {/* A hidden, always-mounted scrollbar. We don't show it (ScrollGauge in the
+        island is the visible affordance), but keeping it mounted is what makes
+        Radix set overflow:scroll on the viewport so the mouse wheel works. */}
+    <ScrollAreaPrimitive.ScrollAreaScrollbar
+      orientation="vertical"
+      forceMount
+      className="pointer-events-none invisible w-0"
+    >
+      <ScrollAreaPrimitive.ScrollAreaThumb />
+    </ScrollAreaPrimitive.ScrollAreaScrollbar>
   </ScrollAreaPrimitive.Root>
 ));
 ScrollArea.displayName = ScrollAreaPrimitive.Root.displayName;
 
-const ScrollBar = React.forwardRef<
-  React.ElementRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>,
-  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>
->(({ className, orientation = "vertical", ...props }, ref) => (
-  <ScrollAreaPrimitive.ScrollAreaScrollbar
-    ref={ref}
-    orientation={orientation}
-    className={cn(
-      "flex touch-none select-none transition-opacity duration-300",
-      "data-[state=hidden]:opacity-0",
-      orientation === "vertical" &&
-        "h-full w-2 border-l border-transparent py-px",
-      orientation === "horizontal" &&
-        "h-2 flex-col border-t border-transparent px-px",
-      className
-    )}
-    {...props}
-  >
-    <ScrollAreaPrimitive.ScrollAreaThumb
-      className={cn(
-        "relative flex-1 rounded-full bg-ink-faint/60 transition-colors duration-300",
-        "hover:bg-ink-muted"
-      )}
-    />
-  </ScrollAreaPrimitive.ScrollAreaScrollbar>
-));
-ScrollBar.displayName = ScrollAreaPrimitive.ScrollAreaScrollbar.displayName;
-
-export { ScrollArea, ScrollBar };
+export { ScrollArea };

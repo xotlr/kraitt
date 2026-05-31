@@ -156,15 +156,10 @@ export function SpectrumEq() {
   return (
     <div
       aria-hidden
-      className="flex h-full w-full gap-[3px] rounded-[7px] p-[3px]"
-      style={{
-        background:
-          "linear-gradient(180deg, color-mix(in srgb, var(--console-recess) 70%, black), var(--console-recess))",
-        boxShadow: [
-          "inset 0 0 0 1px color-mix(in srgb, black 55%, transparent)",
-          "inset 0 2px 4px color-mix(in srgb, black 65%, transparent)",
-        ].join(","),
-      }}
+      // Recessed window shared with the VU dial (.console-recess-window) —
+      // theme-softened in light mode so the bar isn't a dark well with a hard
+      // black border fighting the navpills.
+      className="console-recess-window flex h-full w-full gap-[3px] rounded-[7px] p-[3px]"
     >
       {BANDS.map((band, b) => (
         <div key={band} className="flex flex-1 flex-col items-center gap-[2px]">
