@@ -29,8 +29,14 @@ import { useAudioGlow } from "@/hooks/use-audio-glow";
 export function Island({ children }: { children: React.ReactNode }) {
   const edgeRef = useAudioGlow<HTMLDivElement>();
 
+  // The outer column is transparent — the body chassis (charcoal grain in
+  // dark, walnut in light) shows through the top/bottom gutter exactly as it
+  // does through the side rails, so the screen sits in ONE continuous frame.
+  // This used to fill --color-bezel, which put an opaque grey strip over the
+  // chassis above and below the screen that did not match the rails. The
+  // screen card below keeps its own bg-canvas, so only the gutter changes.
   return (
-    <div className="flex-1 min-w-0 h-full bg-canvas py-2 sm:py-2.5 md:py-3">
+    <div className="flex-1 min-w-0 h-full py-2 sm:py-2.5 md:py-3">
       <div className="relative h-full w-full">
         <div className="relative h-full w-full overflow-hidden rounded-[1.25rem] bg-canvas">
           {/* children render <Scene/> (z-0) then the scroll content

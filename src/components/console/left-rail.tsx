@@ -34,7 +34,7 @@ export function LeftRail() {
       variants={rail}
       initial="hidden"
       animate="show"
-      className="hidden lg:flex shrink-0 flex-col items-center gap-3"
+      className="hidden lg:flex shrink-0 flex-col items-center gap-2 select-none"
       style={{
         width: "var(--console-left-rail-w)",
         paddingTop: "var(--console-rail-inset)",
@@ -42,23 +42,31 @@ export function LeftRail() {
       }}
     >
       {/* Brand plate — the wordmark sits at the top of the left rail, the
-          desk's name tag. Given the same --console-unit box as a button so
-          its spacing rhythm matches the buttons below it. Links home. */}
-      <motion.a
-        variants={item}
-        href="#hero"
-        onClick={scrollTo("hero")}
-        className="flex items-center justify-center font-display text-sm leading-none text-ink hover:text-ink-muted transition-colors"
-        style={{ width: "var(--console-unit)", height: "var(--console-unit)" }}
-      >
-        sk
-      </motion.a>
+          desk's name tag. Housed in the same recessed navpill as every other
+          cluster so the rail reads as one language top to bottom; the anchor
+          keeps the --console-unit box so its rhythm matches the caps below.
+          Links home. */}
+      <motion.div variants={item} className="console-group">
+        <a
+          href="#hero"
+          onClick={scrollTo("hero")}
+          className="flex items-center justify-center font-display text-sm leading-none text-ink-muted hover:text-ink transition-colors"
+          style={{ width: "var(--console-unit)", height: "var(--console-unit)" }}
+        >
+          sk
+        </a>
+      </motion.div>
 
       {/* Source select — the two inputs feeding the strip. Colour-coded by
           function: the music TRANSPORT plays/pauses the track (green when
           playing), MIC is a record/input source (red when live), the way a
           desk colours its caps. */}
-      <motion.div variants={item}>
+      <motion.div
+        variants={item}
+        role="group"
+        aria-label="Audioquellen"
+        className="console-group flex flex-col items-center gap-1.5"
+      >
         <StudioButton
           active={musicOn}
           tone="play"
@@ -76,13 +84,11 @@ export function LeftRail() {
           {/* Transport: Play when stopped, Pause when playing. Filled
               weight so the glyph reads as a solid transport cap. */}
           {musicOn ? (
-            <Pause size={22} weight="fill" />
+            <Pause size={17} weight="fill" />
           ) : (
-            <Play size={22} weight="fill" />
+            <Play size={17} weight="fill" />
           )}
         </StudioButton>
-      </motion.div>
-      <motion.div variants={item}>
         <StudioButton
           active={micOn}
           tone="rec"
@@ -90,17 +96,29 @@ export function LeftRail() {
           onClick={toggleMic}
           ariaLabel="Mikrofon"
         >
-          <Microphone size={24} weight={micOn ? "fill" : "regular"} />
+          <Microphone size={19} weight={micOn ? "fill" : "regular"} />
         </StudioButton>
       </motion.div>
 
       {/* Channel strip — a real fader beside a dBFS meter ladder, filling
           the rest of the column down to a small bottom inset (matches the
-          top inset so it reads centered rather than floating mid-rail). */}
+          top inset so it reads centered rather than floating mid-rail).
+          Housed in the same recessed navpill as the button clusters so the
+          whole rail reads as one language: every module sits DOWN IN a
+          shallow trough. The pill's padding (--console-group-pad) frames the
+          strip exactly as it frames a row of caps, so the strip's outer width
+          lines up flush with the source-button pill above it. */}
       <motion.div
         variants={item}
-        className="min-h-0 flex-1"
-        style={{ width: "var(--console-strip-w)" }}
+        className="console-group min-h-0 flex-1 flex-col"
+        style={{
+          // Outer pill width = strip content (one cap wide) + the pill's own
+          // padding on both sides, so the strip's content column stays exactly
+          // --console-strip-w and the pill's outer edge lines up with the
+          // source-button pill above (same content + same pad = same width).
+          width:
+            "calc(var(--console-strip-w) + var(--console-group-pad, 6px) * 2)",
+        }}
       >
         <ChannelStrip />
       </motion.div>

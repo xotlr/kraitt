@@ -49,7 +49,7 @@ export function KnobRail() {
       variants={rail}
       initial="hidden"
       animate="show"
-      className="hidden lg:flex shrink-0 flex-col items-center justify-between"
+      className="hidden lg:flex shrink-0 flex-col items-center justify-between select-none"
       style={{
         width: "var(--console-rail-w)",
         paddingTop: "var(--console-rail-inset)",
@@ -60,7 +60,7 @@ export function KnobRail() {
           settings group below is intentionally OUTSIDE this <nav> so AT
           users find section links here and site controls as their own
           group, not unexpectedly inside navigation. */}
-      <nav aria-label="Sektionen" className="flex flex-col items-center gap-3">
+      <nav aria-label="Sektionen" className="console-group flex flex-col items-center gap-1.5">
         {SECTIONS.map((s) => {
           const Icon = s.icon;
           const isActive = active === s.id;
@@ -73,7 +73,7 @@ export function KnobRail() {
                 ariaLabel={s.label}
                 ariaCurrent={isActive}
               >
-                <Icon size={24} weight={isActive ? "fill" : "regular"} />
+                <Icon size={18} weight={isActive ? "fill" : "regular"} />
               </StudioButton>
             </motion.div>
           );
@@ -86,12 +86,12 @@ export function KnobRail() {
         variants={item}
         role="group"
         aria-label="Einstellungen"
-        className="flex flex-col items-center gap-3"
+        className="console-group flex flex-col items-center gap-1.5"
       >
-        <ThemeToggle iconSize={24} />
+        <ThemeToggle iconSize={18} />
         {/* Language toggle — flag switch. Functional state (persists, sets
             <html lang>); copy translation is a later pass. */}
-        <LanguageToggle iconSize={24} />
+        <LanguageToggle iconSize={18} />
       </motion.div>
     </motion.div>
   );

@@ -39,10 +39,11 @@ const SCALE_TICKS = [0, -6, -12, -18, -24, -36, -48];
 // green below. -6 / -18 are conventional broadcast-ish guides.
 const RED_DB = -6;
 const AMBER_DB = -18;
-// Rest brightness of an unlit segment. High enough that the ladder
-// structure + colour zones read at idle (a real LED meter's segments are
-// visible unlit), low enough that lit segments clearly pop above it.
-const IDLE_OPACITY = 0.28;
+// Rest brightness of an unlit segment. A real LED ladder reads as a row of
+// near-dark cells when idle — the structure is faintly visible but the whole
+// effect is the CONTRAST between an off cell and a lit one. Keep this low so
+// silence is genuinely dim and a lit segment pops bright above it.
+const IDLE_OPACITY = 0.13;
 
 // Fader detents — the volume snaps to these notches so the cap settles on
 // defined positions with a soft step rather than drifting to any analog
@@ -83,10 +84,22 @@ function zoneColor(db: number): string {
   return "var(--meter-green)";
 }
 
+/** Colour for the fader's level fill, by fader POSITION (0..1) rather than
+ *  dBFS — green at safe gain, amber from just below unity (0.75) upward, red
+ *  as it pushes hot past unity. Same three-zone language as the meter so the
+ *  fader fill and the meter ladder read as one colour system. */
+function faderZoneColor(v: number): string {
+  if (v > 0.8) return "var(--meter-red)";
+  if (v >= 0.6) return "var(--meter-amber)";
+  return "var(--meter-green)";
+}
+
 export function ChannelStrip() {
   const levels = useAudioLevels();
   const { volume, setVolume, musicOn, micOn } = useAudio();
   const active = musicOn || micOn;
+  // Colour of the fader's level fill at the current volume (see helper).
+  const faderZone = faderZoneColor(volume);
 
   // One container; children driven by CSS vars written on rAF so the
   // ladder + peak tick animate at 60fps with zero React re-render.
@@ -201,38 +214,25 @@ export function ChannelStrip() {
       className="channel-strip relative h-full w-full"
       style={
         {
-          // Muted zone colours — desaturated, dustier hues so the meter
-          // reads as a refined instrument display rather than candy LEDs.
-          // Still clearly green / amber / red, just toned down to sit in
-          // the dark, cinematic palette.
-          "--meter-green": "#6e9b78",
-          "--meter-amber": "#bd9856",
-          "--meter-red": "#bf6b62",
+          // Zone colours. The OLD values were so desaturated they read as a
+          // brown smear at idle opacity. These have real chroma — they look
+          // like coloured LEDs when LIT (brightness boost + halo on the lit
+          // path) yet sit dark and tasteful when idle. Cooled slightly so
+          // they belong to the same cold key light as the rest of the desk.
+          "--meter-green": "#57c87f",
+          "--meter-amber": "#e0a94a",
+          "--meter-red": "#e0584e",
         } as React.CSSProperties
       }
     >
-      {/* ── FACEPLATE ───────────────────────────────────────────────────
-          A near-black machined plate the fader + meter are MOUNTED INTO.
-          Defined by edge-lit hairlines (top highlight, bottom shade) over
-          a graphite fill barely lifted off true black, so it reads as dark
-          anodized metal without leaving the OLED-black brand. Two screws
-          at top/bottom sell it as a bolted-on panel. */}
-      <div
-        className="absolute inset-0 flex gap-1 rounded-[12px] px-1.5 py-2.5"
-        style={{
-          // Graphite, just off black, with a faint top→bottom sheen.
-          background:
-            "linear-gradient(180deg, color-mix(in srgb, var(--color-ink) 7%, var(--color-canvas)) 0%, var(--color-canvas) 55%, color-mix(in srgb, var(--color-ink) 4%, var(--color-canvas)) 100%)",
-          boxShadow: [
-            // top edge highlight + bottom edge shade = machined bevel
-            "inset 0 1px 0 color-mix(in srgb, white 7%, transparent)",
-            "inset 0 -1px 0 color-mix(in srgb, black 40%, transparent)",
-            "0 0 0 1px var(--color-hairline)",
-            // soft lift off the bezel so the plate sits proud
-            "0 2px 6px color-mix(in srgb, black 35%, transparent)",
-          ].join(","),
-        }}
-      >
+      {/* ── MOUNT ─────────────────────────────────────────────────────────
+          Transparent layout container holding the fader slot + meter window.
+          The strip now sits inside the rail's recessed navpill (the .console-
+          group wrapper in LeftRail), so the pill IS the housing — this no
+          longer paints its own raised graphite sub-plate (that fought the
+          recess by reading as a plate inside a trough). It keeps only the
+          flex layout + the inner padding that frames the slot/window. */}
+      <div className="absolute inset-0 flex gap-1.5 px-0.5 pb-3 pt-1">
         {/* ── FADER ─────────────────────────────────────────────────────
             A routed slot cut into the plate with a real molded cap riding
             in it. The cap is the set volume; a unity (0 dB) mark sits at
@@ -249,12 +249,33 @@ export function ChannelStrip() {
             style={{
               width: "6px",
               background:
-                "linear-gradient(180deg, color-mix(in srgb, black 55%, transparent), color-mix(in srgb, black 35%, transparent))",
+                "linear-gradient(180deg, color-mix(in srgb, var(--console-recess) 70%, black), var(--console-recess))",
               boxShadow: [
                 "inset 0 0 0 1px color-mix(in srgb, black 50%, transparent)",
-                "inset 0 2px 3px color-mix(in srgb, black 65%, transparent)",
+                "inset 0 2px 3px color-mix(in srgb, black 70%, transparent)",
                 "inset 0 -1px 1px color-mix(in srgb, white 5%, transparent)",
               ].join(","),
+            }}
+          />
+          {/* Level fill — a tone-coloured column rising from the slot floor up
+              to the cap, so the SET VOLUME reads as a coloured quantity even in
+              silence (the meter beside it only lights with live signal; the
+              fader is what the fill answers). Colour follows the same zone
+              language as the meter — green at safe levels, amber approaching
+              unity, red as it pushes hot — and it GLOWS softly so it reads as
+              an illuminated fader track, not a painted bar. Sits above the dark
+              groove, below the ticks + cap. */}
+          <div
+            aria-hidden
+            className="absolute left-1/2 bottom-0 -translate-x-1/2 rounded-full"
+            style={{
+              width: "6px",
+              // Fill height tracks the cap centre: from the slot floor (SLOT_PAD)
+              // up to the cap's seated position, so the column meets the cap.
+              height: `calc(${SLOT_PAD}px + ${volume} * (100% - ${SLOT_PAD * 2}px))`,
+              background: `linear-gradient(180deg, color-mix(in srgb, ${faderZone} 92%, white) 0%, ${faderZone} 100%)`,
+              boxShadow: `0 0 6px color-mix(in srgb, ${faderZone} 55%, transparent), inset 0 0 0 1px color-mix(in srgb, ${faderZone} 60%, transparent)`,
+              transition: "height 110ms cubic-bezier(0.22,1,0.36,1), background 200ms, box-shadow 200ms",
             }}
           />
           {/* Detent ticks — a hairline notch at each snap stop so the fader's
@@ -292,22 +313,25 @@ export function ChannelStrip() {
               width: "16px",
               height: `${CAP_H}px`,
               bottom: `calc(${volume} * (100% - ${SLOT_PAD * 2}px) + ${SLOT_PAD}px - ${CAP_H / 2}px)`,
-              // Graphite cap, on-brand: barely lifted off the canvas, like a
-              // button. Warm-neutral so it belongs to the desk, not a white chip.
+              // Molded graphite cap riding the slot — same material as the
+              // buttons: distinctly LIGHTER than the routed slot, with a lit
+              // top bevel grading to a darker body, so it reads as a solid
+              // object you can pinch. On grab it presses in (the cast shadow
+              // tightens, the top highlight dims).
               background:
-                "linear-gradient(180deg, color-mix(in srgb, var(--color-ink) 26%, var(--color-canvas)) 0%, color-mix(in srgb, var(--color-ink) 14%, var(--color-canvas)) 50%, color-mix(in srgb, var(--color-ink) 20%, var(--color-canvas)) 100%)",
+                "linear-gradient(180deg, var(--console-cap-hi) 0%, var(--console-cap) 50%, color-mix(in srgb, var(--console-cap) 78%, black) 100%)",
               boxShadow: grabbed
                 ? [
-                    "inset 0 1px 0 color-mix(in srgb, white 12%, transparent)",
-                    "inset 0 -1px 0 color-mix(in srgb, black 35%, transparent)",
-                    "0 1px 1px color-mix(in srgb, black 55%, transparent)",
-                    "0 0 0 1px var(--color-hairline)",
+                    "inset 0 1px 0 color-mix(in srgb, white 10%, transparent)",
+                    "inset 0 -1px 1px color-mix(in srgb, black 40%, transparent)",
+                    "0 1px 1px color-mix(in srgb, black 60%, transparent)",
+                    "0 0 0 1px var(--console-edge)",
                   ].join(",")
                 : [
-                    "inset 0 1px 0 color-mix(in srgb, white 16%, transparent)",
-                    "inset 0 -1px 0 color-mix(in srgb, black 30%, transparent)",
-                    "0 2px 3px color-mix(in srgb, black 50%, transparent)",
-                    "0 0 0 1px var(--color-hairline)",
+                    "inset 0 1px 0 color-mix(in srgb, white 18%, transparent)",
+                    "inset 0 -1px 1px color-mix(in srgb, black 35%, transparent)",
+                    "0 2px 4px color-mix(in srgb, black 55%, transparent)",
+                    "0 0 0 1px var(--console-edge)",
                   ].join(","),
               transform: grabbed ? "translateY(0.5px)" : "translateY(0)",
               transition: "bottom 110ms cubic-bezier(0.22,1,0.36,1), box-shadow 120ms, transform 120ms",
@@ -357,10 +381,10 @@ export function ChannelStrip() {
           className="relative flex h-full flex-1 flex-col-reverse gap-[2px] overflow-hidden rounded-[7px] p-[3px]"
           style={{
             background:
-              "linear-gradient(180deg, color-mix(in srgb, black 50%, transparent), color-mix(in srgb, black 32%, transparent))",
+              "linear-gradient(180deg, color-mix(in srgb, var(--console-recess) 70%, black), var(--console-recess))",
             boxShadow: [
               "inset 0 0 0 1px color-mix(in srgb, black 55%, transparent)",
-              "inset 0 2px 3px color-mix(in srgb, black 55%, transparent)",
+              "inset 0 2px 4px color-mix(in srgb, black 65%, transparent)",
               "inset 0 -1px 0 color-mix(in srgb, white 5%, transparent)",
             ].join(","),
           }}
@@ -407,10 +431,10 @@ export function ChannelStrip() {
                 key={db}
                 className="font-mono leading-none"
                 style={{
-                  fontSize: "5px",
-                  letterSpacing: "0.01em",
-                  color: "color-mix(in srgb, var(--color-ink) 65%, transparent)",
-                  textShadow: "0 0 2px rgba(0,0,0,0.9), 0 0 1px rgba(0,0,0,0.9)",
+                  fontSize: "6px",
+                  letterSpacing: "0.02em",
+                  color: "var(--console-print)",
+                  textShadow: "0 0 2px rgba(0,0,0,0.95), 0 0 1px rgba(0,0,0,0.95)",
                 }}
               >
                 {db === FLOOR_DB ? "-∞" : db}
@@ -418,6 +442,26 @@ export function ChannelStrip() {
             ))}
           </div>
         </div>
+
+        {/* Silkscreen legend — engraved panel print at the foot of the
+            strip, the desk's channel name. Letter-spaced mono in the pale
+            print ink, with a faint top highlight so it reads as etched into
+            the metal rather than sitting on top of it. aria-hidden: it's
+            decorative; the fader already has an accessible label. */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-[5px] text-center font-mono uppercase leading-none"
+          style={{
+            fontSize: "6px",
+            letterSpacing: "0.34em",
+            // shift right half a letter so the tracked text reads centred
+            textIndent: "0.34em",
+            color: "var(--console-print)",
+            textShadow: "0 1px 0 color-mix(in srgb, white 6%, transparent)",
+          }}
+        >
+          Master
+        </span>
       </div>
 
       <style jsx>{`

@@ -61,7 +61,7 @@ export default function RootLayout({
       {/* overflow-hidden because actual page scroll happens inside the
           PageScroll ScrollArea below. Without this, native scrollbars
           can still appear if children overflow the body. */}
-      <body className="text-ink antialiased overflow-hidden h-svh bg-canvas">
+      <body className="console-chassis text-ink antialiased overflow-hidden h-svh">
         {/* SVG filter for DOM chromatic aberration. Splits RGB into
             three channels, offsets each by 1-2px in opposing
             directions, composites with screen blending. Same effect

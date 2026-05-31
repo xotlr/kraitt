@@ -39,10 +39,10 @@ export function ConsolePanel() {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 1.2, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 pointer-events-auto px-[var(--gutter)] pb-[max(1rem,env(safe-area-inset-bottom))] pt-4"
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 pointer-events-auto px-[var(--gutter)] pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 select-none"
     >
       <div className="flex items-center justify-between gap-3 overflow-x-auto">
-        <div className="flex items-center gap-2.5">
+        <div className="console-group flex items-center gap-2">
           {SECTIONS.map((s) => {
             const Icon = s.icon;
             const isActive = active === s.id;
@@ -55,46 +55,58 @@ export function ConsolePanel() {
                 ariaLabel={s.label}
                 ariaCurrent={isActive}
               >
-                <Icon size={20} weight={isActive ? "fill" : "regular"} />
+                <Icon size={17} weight={isActive ? "fill" : "regular"} />
               </StudioButton>
             );
           })}
         </div>
 
         <div className="flex items-center gap-2.5">
-          <StudioButton
-            active={musicOn}
-            tone="play"
-            dot
-            size={42}
-            disabled={musicStatus === "unavailable"}
-            onClick={toggleMusic}
-            ariaLabel={
-              musicStatus === "unavailable"
-                ? "Musik — nicht verfügbar"
-                : musicOn
-                  ? "Pause"
-                  : "Wiedergabe"
-            }
+          <div
+            role="group"
+            aria-label="Audioquellen"
+            className="console-group flex items-center gap-2"
           >
-            {musicOn ? (
-              <Pause size={20} weight="fill" />
-            ) : (
-              <Play size={20} weight="fill" />
-            )}
-          </StudioButton>
-          <StudioButton
-            active={micOn}
-            tone="rec"
-            dot
-            size={42}
-            onClick={toggleMic}
-            ariaLabel="Mikrofon"
+            <StudioButton
+              active={musicOn}
+              tone="play"
+              dot
+              size={42}
+              disabled={musicStatus === "unavailable"}
+              onClick={toggleMusic}
+              ariaLabel={
+                musicStatus === "unavailable"
+                  ? "Musik — nicht verfügbar"
+                  : musicOn
+                    ? "Pause"
+                    : "Wiedergabe"
+              }
+            >
+              {musicOn ? (
+                <Pause size={17} weight="fill" />
+              ) : (
+                <Play size={17} weight="fill" />
+              )}
+            </StudioButton>
+            <StudioButton
+              active={micOn}
+              tone="rec"
+              dot
+              size={42}
+              onClick={toggleMic}
+              ariaLabel="Mikrofon"
+            >
+              <Microphone size={19} weight={micOn ? "fill" : "regular"} />
+            </StudioButton>
+          </div>
+          <div
+            role="group"
+            aria-label="Einstellungen"
+            className="console-group flex items-center gap-2"
           >
-            <Microphone size={20} weight={micOn ? "fill" : "regular"} />
-          </StudioButton>
-          <ThemeToggle iconSize={20} />
-          <LanguageToggle iconSize={20} />
+            <ThemeToggle iconSize={17} />
+            <LanguageToggle iconSize={17} />
+          </div>
         </div>
       </div>
     </motion.div>

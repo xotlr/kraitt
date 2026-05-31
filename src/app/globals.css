@@ -1,13 +1,25 @@
 @import "tailwindcss";
 
 @theme {
-  /* True OLED black. The whole brand sits on this — black pixels are
-     genuinely off on OLED displays, which gives the type and strings a
-     real edge instead of floating on grey. */
-  --color-canvas: #000000;
+  /* The scene backdrop — the matte directly behind the WebGL screen. Was
+     pure OLED black; lifted a hair to a very dark cool near-black so the
+     whole site stops reading as a black void while the scene keeps a hard
+     edge (the WebGL fills this anyway; it only shows at the screen rim and
+     on load). The CHASSIS around it is the lighter --color-bezel below. */
+  --color-canvas: #050608;
   /* Slightly raised surfaces (dialog) sit a hair above pure black so
      they're visible when overlaid. Biased cool. */
   --color-canvas-elevated: #0a0a0c;
+
+  /* The CHASSIS — the desk the whole machine is built into. The bezel/
+     gutter around the screen and the body behind the rails use this, NOT
+     pure black. A DEEP cool charcoal, only a hair above the scene matte so
+     the frame reads as a dark surround that lets the screen pop, while still
+     sitting just proud of the pure-black WebGL rim (the navpills + caps carry
+     the rail's surface detail, so the field itself can go this dark). Was a
+     lighter #101116; dropped per design so the gutter recedes. The scene's
+     own backdrop stays --color-canvas (near-black) for its hard edge. */
+  --color-bezel: #07090f;
 
   /* Type sits slightly cool of cream — pale, not amber. */
   --color-ink: #ece8df;
@@ -25,6 +37,24 @@
      trailing dot picks this up so the wordmark belongs to the same
      cold palette as the strands. */
   --color-string: #e6dfd1;
+
+  /* ── Console graphite ladder ──────────────────────────────────────────
+     The scene matte stays OLED-black; the CONSOLE chrome does not. A real
+     desk reads as gear because it has a value structure under one raking
+     light: a mid-dark PANEL, control caps that sit LIGHTER and proud of it,
+     recesses that go DARKER. Pure black has no material — these five cool-
+     graphite steps give the rails a surface that catches light. Biased a
+     touch cool/blue, like anodized aluminium under a studio key light.
+     Used only by components/console/* — never by the scene or editorial. */
+  --console-panel: #191b21; /* the faceplate the rails are milled from */
+  --console-panel-hi: #23252d; /* panel's top edge, catching the key light */
+  --console-cap: #25272f; /* a raised control cap — LIGHTER than the panel */
+  --console-cap-hi: #34373f; /* cap's lit top bevel */
+  --console-recess: #0a0b0e; /* routed slots / meter window — darker than all */
+  --console-edge: #050608; /* the hard shadow line where a cap meets the panel */
+  /* Silkscreen — the pale legend ink printed on the panel (labels, ticks).
+     Cool grey, low-contrast like real panel print, never pure white. */
+  --console-print: #6f7480;
 
   --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-serif), ui-serif, Georgia, serif;
@@ -64,7 +94,7 @@
      edge; the rail width and meter width derive from it, so changing this
      single value rescales both side rails, every button, and the volume
      meter in lockstep. */
-  --console-unit: 52px;
+  --console-unit: 40px;
   --console-rail-pad: 14px; /* breathing room each side of a cap in the rail */
   --console-rail-w: calc(var(--console-unit) + var(--console-rail-pad) * 2);
   /* The channel strip is exactly one button cap wide so the fader+meter
@@ -72,9 +102,32 @@
      therefore share the same width. */
   --console-strip-w: var(--console-unit);
   --console-left-rail-w: var(--console-rail-w);
-  /* Vertical inset of the button GROUPS from the rail's top/bottom edges,
-     so the groups sit indented rather than flush. */
-  --console-rail-inset: clamp(0.6rem, 0.4rem + 0.7vh, 1.25rem);
+  /* The screen card's corner radius (mirrors the rounded-[1.25rem] on the
+     island) and the island's own top/bottom gutter (py-3 = 0.75rem). The
+     rails sit BESIDE the screen; for a rail control to sit level with where
+     the screen's straight edge begins — i.e. inside the corner arc, not
+     overshooting it — the first/last control must clear (gutter + radius)
+     from the viewport edge. Quoted as tokens so the seating is exact, not
+     eyeballed, and tracks the island if either value changes. */
+  --screen-radius: 1.25rem;
+  --island-gutter: 0.75rem;
+  /* The actual painted chassis tone the rails sit on; navpills mix off this
+     so a pill is always a recess into the real surface. Light mode overrides
+     it below (must stay unlayered to beat @layer base). */
+  --console-surface: var(--color-bezel);
+  --parchment: #e6e3dc;
+  /* Vertical inset of the button GROUPS from the rail's top/bottom edges, so
+     the groups clear the screen's rounded corners rather than running to its
+     square bounding box. Was a small flat clamp (controls overshot the arc);
+     now derived from the screen radius + island gutter so the top button and
+     the fader's full travel begin where the screen's straight edge does. */
+  --console-rail-inset: var(--screen-radius);
+}
+
+/* Light-mode chassis surface — unlayered so it overrides the dark default
+   above (layered rules in @layer base would otherwise lose to it). */
+html.light {
+  --console-surface: var(--parchment);
 }
 
 /* ── Theming ──────────────────────────────────────────────────────────
@@ -90,7 +143,12 @@
 @property --color-canvas {
   syntax: "<color>";
   inherits: true;
-  initial-value: #000000;
+  initial-value: #050608;
+}
+@property --color-bezel {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #07090f;
 }
 @property --color-canvas-elevated {
   syntax: "<color>";
@@ -132,6 +190,7 @@
     --transition-theme: 450ms cubic-bezier(0.22, 1, 0.36, 1);
     transition:
       --color-canvas var(--transition-theme),
+      --color-bezel var(--transition-theme),
       --color-canvas-elevated var(--transition-theme),
       --color-ink var(--transition-theme),
       --color-ink-muted var(--transition-theme),
@@ -150,12 +209,27 @@
        column in light mode. */
     --readability-rgb: 245 242 236;
     --color-canvas: #f5f2ec;
+    /* Chassis a touch deeper than the paper canvas so the bezel reads as a
+       framing surface around the screen, like the warm-grey body of a desk. */
+    --color-bezel: #e7e2d8;
     --color-canvas-elevated: #ffffff;
     --color-ink: #1a1714;
     --color-ink-muted: #6b6358;
     --color-ink-faint: #b3a89a;
     --color-hairline: #ddd6c8;
     --color-hairline-hover: #c7bda9;
+
+    /* Console in light mode → brushed-aluminium desk. Same value LOGIC as
+       dark (caps proud and a touch lighter than the panel, recesses darker,
+       a lit top bevel) but inverted into a warm-grey metal so the chrome
+       reads as a pale anodized surface rather than dark graphite. */
+    --console-panel: #dcd8cf; /* warm aluminium faceplate */
+    --console-panel-hi: #ece9e2; /* lit top edge */
+    --console-cap: #eae6dd; /* raised cap, lighter than the panel */
+    --console-cap-hi: #f6f3ec; /* cap's lit top bevel */
+    --console-recess: #c4bfb4; /* routed slot — darker than the panel */
+    --console-edge: #b0aa9d; /* contact shadow line */
+    --console-print: #7d766a; /* engraved legend ink */
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -273,4 +347,100 @@
     text-transform: uppercase;
     color: var(--color-ink-muted);
   }
+}
+
+@layer components {
+  /* ── Chassis ──────────────────────────────────────────────────────────
+     The whole back surface behind everything — body, bezel, AND showing
+     THROUGH the screen behind the WebGL scene (the scene clears transparent,
+     so the rim/load areas reveal this). The texture is a fine ISOTROPIC film
+     grain (random, non-directional) over the charcoal bezel tone, lit a touch
+     from the top — the Death Stranding / high-tech-HUD surface, NOT bolted-on
+     metal. The old vertical pinstripe was regular/periodic, which read as a
+     CSS gradient and collapsed into corduroy over the narrow rails; real
+     anodized + powder-coat surfaces have non-periodic grain, so we use SVG
+     fractal noise instead. The rails have NO panel of their own; the buttons
+     sit on this field directly. Theme-aware via --color-bezel.
+
+     Performance: the grain is a STATIC, CSS-composited data-URI (no JS, no
+     <canvas>, no animation) confined to the chrome backdrop, so it adds no
+     per-frame cost on top of the r3f scene. */
+  .console-chassis {
+    background-color: var(--color-bezel);
+    background-image:
+      /* Isotropic fractal grain — high-frequency monochrome turbulence,
+         tiled at 160px, sitting at low opacity so it reads as fine surface
+         tooth rather than visible noise. baseFrequency is high (fine grain)
+         and stitchTiles makes the 160px tile seamless. */
+      var(--chassis-grain),
+      /* gentle top→bottom key light across the whole field */
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, white 3%, var(--color-bezel)) 0%,
+        var(--color-bezel) 40%,
+        color-mix(in srgb, black 14%, var(--color-bezel)) 100%
+      );
+    background-size:
+      160px 160px,
+      100% 100%;
+    background-repeat: repeat, no-repeat;
+  }
+
+  /* The grain itself, factored into a token so light mode can dial its
+     strength independently (a paper/wood field wants less grain than a
+     near-black one before it reads as dirt). Dark theme: ~4% opacity white
+     noise. The fractalNoise turbulence is rendered to alpha then flattened
+     to a soft grey so it tints both up and down off the bezel tone. */
+  :root {
+    --chassis-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  }
+
+  /* Light mode: flat warm-parchment frame (no texture). */
+  html.light .console-chassis {
+    background-color: var(--parchment);
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in srgb, white 6%, var(--parchment)) 0%,
+      var(--parchment) 45%,
+      color-mix(in srgb, black 12%, var(--parchment)) 100%
+    );
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+  }
+
+  /* ── Button group (navpill) ───────────────────────────────────────────
+     Groups a CLUSTER of buttons (nav home→contact, settings theme+language,
+     sources MUS/MIC) into one unit, housed in a barely-there recessed pill —
+     a faint inset trough a hair darker than the bezel, edged by a single
+     hairline, with a soft top-inner shadow so the caps read as sitting DOWN
+     IN a shallow frosted recess. Death-Stranding-quiet, not a milled metal
+     faceplate: the housing is felt, not seen, so a row of caps reads as one
+     grouped module without adding a competing surface. The flex
+     direction/alignment are set by the consumer's utility classes. */
+  .console-group {
+    display: flex;
+    padding: var(--console-group-pad, 6px);
+    border-radius: var(--console-group-radius, 13px);
+    /* Concentric inner radius for the caps this pill contains: the cap curve
+       = pill curve − the pad between them, so caps nest inside the rounded
+       trough instead of reading as sharp chips. Consumed by StudioButton. */
+    --console-cap-radius: calc(
+      var(--console-group-radius, 13px) - var(--console-group-pad, 6px)
+    );
+    /* Trough fill: a touch under the SURFACE the rail sits on, so the cluster
+       reads as a recess routed into the field. Mixes off --console-surface
+       (the ACTUAL chassis tone: charcoal bezel in dark, walnut in light)
+       rather than --color-bezel, so the pill never reads as a pale panel
+       floating on a darker body. Nudged up from barely-there so the grouping
+       is clearly visible now that the caps nest concentrically in it. */
+    background: color-mix(in srgb, black 14%, var(--console-surface));
+    /* A shallow inset well: inner top shadow = the trough's own cast shadow,
+       a hairline edge picks up the key light at the lip, faint bottom lift so
+       it sits in the surface. Low-contrast enough to stay chrome-quiet. */
+    box-shadow:
+      inset 0 1px 3px color-mix(in srgb, black 26%, transparent),
+      inset 0 0 0 1px color-mix(in srgb, black 18%, transparent),
+      0 1px 0 color-mix(in srgb, white 5%, transparent);
+  }
+
 }

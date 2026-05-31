@@ -22,6 +22,40 @@ export const categories: { id: Category | "all"; label: string }[] = [
 
 export const projects: Project[] = [
   {
+    id: "p-oskar",
+    title: "Oskar",
+    client: "Verso Studios",
+    role: "Tonmeister",
+    category: "film",
+    year: 2026,
+    medium: "Kurzfilm — Release Herbst 2026",
+    description:
+      "Ein Mann hört durch seine Wand häusliche Gewalt. Heute Nacht muss er sich zwingen zu handeln.",
+    credits: [
+      { label: "Start", value: "Herbst 2026" },
+      { label: "Rolle", value: "Tonmeister" },
+      { label: "Format", value: "Kurzfilm" },
+    ],
+    link: { label: "verso.ac", href: "https://verso.ac" },
+  },
+  {
+    id: "p-last-knight",
+    title: "The Last Knight",
+    client: "Verso Studios",
+    role: "Tonmeister",
+    category: "film",
+    year: 2027,
+    medium: "Kurzfilm — Release Frühjahr 2027",
+    description:
+      "Fünfhundert Jahre später schreitet der unentschlossene Prinz Maximilian I. durch den Frieden, den er nie erlebt hat.",
+    credits: [
+      { label: "Start", value: "Frühjahr 2027" },
+      { label: "Rolle", value: "Tonmeister" },
+      { label: "Format", value: "Kurzfilm" },
+    ],
+    link: { label: "verso.ac", href: "https://verso.ac" },
+  },
+  {
     id: "p-01",
     title: "Heute Konkret",
     client: "ORF",

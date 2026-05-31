@@ -9,11 +9,6 @@ scene that behaves like a vibrating instrument** — a 3D vertex-displaced
 terrain whose waves react to the cursor and to audio, under a cinematic
 post-processing stack. The scene is the brand.
 
-> Note: earlier iterations described "noise blobs and thin strings." That
-> shader (`grainient.tsx`) has been replaced by the 3D terrain scene under
-> `src/components/scene/`. Strings/pluck were the design intent and now
-> read as cursor/audio-driven wave ripples, not literal string geometry.
-
 ## Stack
 
 - Next.js 16 (Turbopack) · React 19 · TypeScript
@@ -22,142 +17,58 @@ post-processing stack. The scene is the brand.
 - Three.js + react-three-fiber + @react-three/drei (shader pipeline)
 - Radix primitives (Dialog only) · Bun
 
-## Architectural principles
+## Design rules
 
-### 1. Pick the primitive that scales with what's coming next, not what's here today
+- **The scene is the brand; UI frames it, never competes.** If a UI
+  element fights the scene for attention (thick borders, heavy buttons,
+  busy illustrations), the element is wrong.
+- **Fraunces at weight 200–300.** Heavier muddies the warm peaks.
+- **One accent color (amber)** — italic accents and shader peaks only.
+- **Hairline dividers, not solid blocks.**
+- **No images, no icons in section content.** The console chrome is the
+  deliberate exception: rails use Phosphor icons
+  (`@phosphor-icons/react`) for the tactile studio buttons. Icons stay
+  out of the editorial body.
+- **Add a dependency only if it reduces complexity elsewhere.** Dialog
+  earns Radix; bespoke type buttons don't. Typed `.ts` data in
+  `src/data/`, no CMS / backend until the need is real.
 
-The shader is the most architecturally consequential decision on this site.
-There are two correct-looking choices:
+## Performance gates
 
-- **Raw WebGL** — minimal, no dependency cost, full control. The right call
-  if the shader is small and frozen.
-- **Three.js (+ react-three-fiber)** — heavier, but a real render graph,
-  declarative scene, automatic disposal, ecosystem for post-processing.
+The scene is the most expensive thing on the page. Current status
+(`src/components/scene/index.tsx`, `src/hooks/use-device-capability.ts`):
 
-We pick **Three.js + r3f**, even though the raw WebGL version is shorter
-*today*. The reasons:
-
-- The shader is going to grow. Strings, ignition, cursor reactivity,
-  potentially per-section variants. Every new feature in raw WebGL = JS
-  plumbing + GLSL changes in two places.
-- The second time you want to compose passes (e.g. bloom on the strings),
-  raw WebGL means writing your own framebuffer/render-target dance.
-  r3f makes that one extra component.
-- Disposal correctness on hot-reload and route transitions is non-trivial
-  in raw WebGL. r3f handles it.
-- The bundle delta (~80–120kb gz, tree-shaken) is amortized across the
-  whole site's lifetime, and this is a portfolio that's loaded once and
-  cached. Marketing-site logic ("every kb matters") does not apply.
-
-**The "overkill" reflex is the wrong heuristic.** "Overkill" should mean
-*complexity that does not pay off*. If the second feature in the same
-domain is already on the roadmap, the framework is not overkill — it's
-the correct level of abstraction.
-
-Same principle applies elsewhere:
-- shadcn primitives only when we actually need a primitive (Dialog yes;
-  Button no, the buttons here are bespoke type)
-- A CMS only if Sufian will edit content himself; otherwise typed `.ts`
-  data files in `src/data/`
-- A backend for the contact form only when spam volume justifies it
-
-### 2. The visual identity is non-negotiable; everything else bends to it
-
-The shader runs on every section. Type weight, spacing, color tokens
-exist to *frame* the shader, not compete with it. If a UI element fights
-the shader for attention (thick borders, heavy buttons, busy
-illustrations), the UI element is wrong.
-
-Concrete consequences:
-- Fraunces at weight 200–300 — anything heavier muddies the warm blobs.
-- No images, and no icons *in section content* (per Sufian's brief,
-  reinforced by the shader doing the visual lifting). The console chrome
-  is the deliberate exception: the rails use Phosphor icons
-  (`@phosphor-icons/react`) for the tactile studio buttons, because the
-  desk metaphor needs glyphs. Icons stay out of the editorial body.
-- Hairline dividers, not solid blocks.
-- One accent color (amber) — it appears in *italic accents* and in the
-  shader peaks. Nowhere else.
-
-### 3. Honest performance gates
-
-The scene is the most expensive thing on the page. The rules, with
-current implementation status (`src/components/scene/index.tsx`,
-`src/hooks/use-device-capability.ts`):
-
-- **[NOT YET ENFORCED] Frame-cap to 30fps desktop / 20fps mobile.** The
-  scene currently runs `frameloop="always"` (full rAF, ~60fps). The cap
-  is intended but not implemented — the terrain has more visible motion
-  than the old drifting noise field, so the "60fps is wasted heat"
-  argument is weaker here, but the gate still belongs. Do not treat this
-  as done.
+- **[NOT YET ENFORCED] Frame-cap to 30fps desktop / 20fps mobile.** Scene
+  runs `frameloop="always"` (~60fps). Still owed — do not treat as done.
 - **[NOT YET ENFORCED] Pause when the tab is hidden.** No
-  `visibilitychange`/`document.hidden` handling exists yet. r3f keeps
-  rendering in a backgrounded tab. This should be added.
-- **[DONE] Skip entirely on low-end devices** (`deviceMemory <= 1` or
+  `visibilitychange`/`document.hidden` handling; r3f keeps rendering in a
+  backgrounded tab. Should be added.
+- **[DONE] Skip on low-end devices** (`deviceMemory <= 1` or
   `hardwareConcurrency <= 1` → tier `low` → `Scene` returns null).
-- **[PARTIAL] `prefers-reduced-motion`** sets `frameloop="demand"` so the
-  scene holds a static frame instead of animating. (Not a hard one-frame
-  stop, but functionally a still image.)
-- **[DONE] DPR capped at 1 on viewports `< 1024px`** (`[1, 1.5]` above,
-  `1` below). The scene is soft; the extra pixels are invisible but the
-  fill cost is real on integrated GPUs.
+- **[PARTIAL] `prefers-reduced-motion`** sets `frameloop="demand"` — a
+  static frame, not a hard one-frame stop.
+- **[DONE] DPR capped at 1 below 1024px** (`[1, 1.5]` above, `1` below).
 
-These rules survive any rewrite. The two NOT-YET-ENFORCED gates are debt,
-not deletions — they should be implemented, not silently dropped. If a
-future change removes any gate, justify it explicitly.
+These gates survive any rewrite. The NOT-YET-ENFORCED ones are debt, not
+deletions — implement them, don't silently drop them. Removing any gate
+needs an explicit justification.
 
-### 4. Where logic lives
+## Where logic lives
 
-- `src/components/scene/*.tsx` is the r3f scene and only the scene
-  (`index.tsx` composes it; `atmosphere.tsx`, `terrain.tsx`,
+- `src/components/scene/*.tsx` — the r3f scene and only the scene
+  (`index.tsx` composes; `atmosphere.tsx`, `terrain.tsx`,
   `camera-rig.tsx` are its parts). No business logic, no content.
-  `grainient.tsx` no longer exists.
-- `src/components/island.tsx` is the monitor-bezel frame that contains
-  the scene; `src/components/console/*` is the desk chrome (rails,
-  studio buttons, level meter, theme/language/audio toggles).
-- `src/components/sections/*.tsx` are content + layout. The scene is
-  mounted once (inside the island, not re-instantiated per section).
-  Sections are German-named: `hero`, `ueber`, `leistungen`,
-  `referenzen`, `kontakt`.
-- `src/lib/*` holds the cross-cutting contexts and the audio engine:
-  `audio.tsx`, `theme-context.tsx`, `language-context.tsx`,
-  `scroll-context.tsx`, `utils.ts`.
-- `src/data/*.ts` is typed content. The site has no database.
-
-### 5. Honesty in the work
-
-- If a feature is half-finished, say so. Don't ship `// TODO`s as if
-  they're complete.
-- If a design call is opinionated, name it as opinionated, not as
-  best practice.
-- If a dependency was added, it earns its place by reducing complexity
-  elsewhere. If it doesn't, remove it.
-
-## Project layout
-
-```
-src/
-  app/                  Next App Router
-    layout.tsx          Root layout: providers, island + console mount, fonts
-    page.tsx            Composes all sections
-    globals.css         Tailwind 4 @theme + tokens
-  components/
-    island.tsx          Monitor-bezel frame; contains the scene
-    page-scroll.tsx     Scroll container / progress wiring
-    section-heading.tsx Shared heading block
-    scene/              r3f scene (index, atmosphere, terrain, camera-rig)
-    console/            Desk chrome: rails, studio buttons, meter, toggles
-    sections/           One file per landing section (German-named)
-    ui/                 Radix-based primitives (dialog, scroll-area)
-  data/projects.ts      Project data (typed)
-  hooks/                React hooks (device-capability, audio-glow)
-  lib/                  audio engine + theme/language/scroll contexts, utils
-```
-
-> Nav is no longer a standalone `nav.tsx` — section navigation lives in
-> the console rails (`components/console/`) and is mounted from
-> `layout.tsx`.
+- `src/components/island.tsx` — monitor-bezel frame containing the scene;
+  `src/components/console/*` — desk chrome (rails, studio buttons, level
+  meter, theme/language/audio toggles). Section nav lives here, not in a
+  standalone `nav.tsx`.
+- `src/components/sections/*.tsx` — content + layout. The scene is mounted
+  once (inside the island), not per section. Sections are German-named:
+  `hero`, `ueber`, `leistungen`, `referenzen`, `kontakt`.
+- `src/lib/*` — cross-cutting contexts and the audio engine (`audio.tsx`,
+  `theme-context.tsx`, `language-context.tsx`, `scroll-context.tsx`,
+  `utils.ts`).
+- `src/data/*.ts` — typed content. The site has no database.
 
 ## Running
 
@@ -178,5 +89,5 @@ any public deploy** with either:
   attribution rendered somewhere on the site), or
 - silence — remove the music toggle entirely, keep only the mic input
 
-The file is referenced from `src/lib/audio.tsx` (see the `MUSIC_SRC`
-constant and the comment immediately above it).
+Referenced from `src/lib/audio.tsx` (the `MUSIC_SRC` constant and the
+comment above it).

@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { RailLabel } from "@/components/console/rail-primitives";
 import { cn } from "@/lib/utils";
 
@@ -9,12 +10,16 @@ import { cn } from "@/lib/utils";
  * weight active — passed by the caller); label is optional and usually
  * omitted on desktop to keep chrome minimal.
  *
- * Tactility = the same near-black machined-plate language as the channel
- * strip: a beveled graphite cap (top highlight + bottom shade) raised off
- * the bezel. Active LATCHES IN — the cap seats down into the plate (the
- * bevel inverts to a deep inset recess) so the press reads from depth
- * alone, with NO border-colour change and NO outer glow. State colour
- * lives only in the tone-coloured icon + the corner LED.
+ * Tactility comes from MATERIAL + LIGHT, not outlines. The cap is graphite
+ * that sits LIGHTER than the panel it's milled into (--console-cap over
+ * --console-panel), with a lit top bevel (--console-cap-hi) and a hard
+ * contact-shadow line below (--console-edge) — so under one raking key
+ * light it reads as a solid object standing proud of the surface, the way
+ * an Apple hardware control does. Active LATCHES IN: the cap drops into the
+ * panel, the bevel inverts to a recess and the contact shadow becomes an
+ * inner shadow, so the press reads from depth alone — NO border-colour
+ * change, NO outer glow. State colour lives only in the tone-coloured icon
+ * + the corner LED.
  */
 /**
  * Function tones — a button's active colour encodes WHAT it does, the way
@@ -87,64 +92,117 @@ export function StudioButton({
       // decorative span — so keyboard focus is announced + visible. rounded
       // matches the cap so the ring hugs the button shape.
       className={cn(
-        "group flex flex-col items-center gap-1.5 rounded-[12px] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-string)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--color-canvas)]",
+        "group flex flex-col items-center gap-1.5 outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-string)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--color-canvas)]",
         disabled && "cursor-not-allowed opacity-40"
       )}
+      // Focus ring hugs the concentric cap shape (matches --console-cap-radius).
+      style={{ borderRadius: "var(--console-cap-radius, 7px)" }}
     >
-      <span
+      <motion.span
         className={cn(
-          "relative flex items-center justify-center rounded-[10px] transition-all duration-300",
-          "group-active:translate-y-px",
+          "relative flex items-center justify-center",
           // The icon takes the function tone on active; idle is muted ink.
           active ? "" : "text-ink-muted group-hover:text-ink"
         )}
+        // Spring-driven interaction. The cap LIFTS a hair on hover (a pad you
+        // can feel under the cursor) and DEPRESSES on press — a real button
+        // throw, not a 1px nudge. A latched cap sits slightly in at rest. The
+        // spring gives it weight; whileTap fires on the parent button's press.
+        initial={false}
+        animate={{ y: latched ? 0.5 : 0 }}
+        whileHover={disabled ? undefined : { y: latched ? 0 : -1.5 }}
+        whileTap={disabled ? undefined : { y: 1 }}
+        transition={{ type: "spring", stiffness: 600, damping: 26, mass: 0.5 }}
         style={{
           width: dim,
           height: dim,
+          // Caps echo the navpill's curve: concentric with the group shell
+          // (pill radius − pad) so a cap reads as nested inside the rounded
+          // trough rather than a sharp chip sitting in it. Falls back to 7px
+          // when there's no enclosing group var.
+          borderRadius: "var(--console-cap-radius, 7px)",
           // Active icon = the function tone (amber nav / green play / red
           // rec). Idle inherits the muted-ink class above.
           color: active ? toneColor : undefined,
-          // Machined cap — same near-black graphite faceplate language as
-          // the channel strip: a beveled plate (top highlight, bottom shade)
-          // raised off the bezel. Active LATCHES IN: the cap seats down into
-          // the plate (the bevel inverts to an inset recess) so the press
-          // reads from depth alone — NO border-colour change, NO outer glow.
-          // State colour lives only in the icon + corner LED.
+          transition: "color 200ms, box-shadow 220ms ease-out, background 220ms",
+          // Graphite cap milled into the panel. IDLE: the cap sits LIGHTER
+          // than the panel (--console-cap), a lit top bevel (--console-cap-hi)
+          // grading to its own body, with a hard contact-shadow line below
+          // (--console-edge) so it reads as a solid object proud of the
+          // surface. LATCHED: it drops in — the fill darkens toward the panel,
+          // the bevel inverts to an inner top shadow, the contact shadow
+          // becomes an inner cradle. Depth alone carries the state.
+          // Raked key light from the TOP-LEFT (≈115deg) rather than straight
+          // down — the asymmetric sheen is the single biggest "real gear vs
+          // plastic" tell. The cap gradient grades from a lit top-left edge to
+          // a shaded bottom-right body.
           background: latched
-            ? "linear-gradient(180deg, color-mix(in srgb, var(--color-ink) 4%, var(--color-canvas)) 0%, color-mix(in srgb, var(--color-ink) 8%, var(--color-canvas)) 100%)"
-            : "linear-gradient(180deg, color-mix(in srgb, var(--color-ink) 9%, var(--color-canvas)) 0%, var(--color-canvas) 60%, color-mix(in srgb, black 30%, var(--color-canvas)) 100%)",
+            ? "linear-gradient(115deg, color-mix(in srgb, var(--console-panel) 80%, black) 0%, var(--console-panel) 100%)"
+            : "linear-gradient(115deg, var(--console-cap-hi) 0%, var(--console-cap) 46%, color-mix(in srgb, var(--console-cap) 82%, black) 100%)",
           boxShadow: latched
             ? [
-                // seated-in recess: deep inset top shade reads as the cap
-                // pushed down into the plate, faint bottom lip catches light.
-                "inset 0 3px 6px color-mix(in srgb, black 65%, transparent)",
-                "inset 0 1px 2px color-mix(in srgb, black 50%, transparent)",
-                "inset 0 -1px 0 color-mix(in srgb, white 6%, transparent)",
-                "0 0 0 1px var(--color-hairline)",
+                // seated-in: deep inner top shadow = cap pushed down into the
+                // panel; a faint bottom lip catches the key light at the floor.
+                "inset 0 3px 5px color-mix(in srgb, black 55%, transparent)",
+                "inset 0 1px 2px color-mix(in srgb, black 45%, transparent)",
+                "inset 0 -1px 0 color-mix(in srgb, var(--console-cap-hi) 70%, transparent)",
+                "0 0 0 1px var(--console-edge)",
+                // SLIGHT tone glow — the cap is lit from within in its function
+                // colour when seated. Restrained (low alpha, tight radius) so it
+                // reads as a faint indicator bloom, not a neon ring. This is the
+                // one place the desk emits colour rather than just reflecting the
+                // key light. Overrides the old depth-only (no-glow) active state.
+                latch
+                  ? `0 0 10px color-mix(in srgb, ${toneColor} 30%, transparent), 0 0 2px color-mix(in srgb, ${toneColor} 22%, transparent)`
+                  : "0 0 0 transparent",
               ].join(",")
             : [
-                // raised machined cap: top edge highlight + bottom edge shade
-                "inset 0 1px 0 color-mix(in srgb, white 9%, transparent)",
-                "inset 0 -1px 0 color-mix(in srgb, black 35%, transparent)",
-                "0 0 0 1px var(--color-hairline)",
-                "0 1px 3px color-mix(in srgb, black 40%, transparent)",
+                // raised pad under a raked top-left key light: the lit bevel
+                // runs across the top-LEFT (inset +1px x, -1px y highlight),
+                // the shade pools bottom-RIGHT (inset -1px x, +1px y), and the
+                // cast shadow falls down-and-right (+1px x) like a real object
+                // lit from the upper left — so each cap floats off the field
+                // as its own distinct pad rather than a flat-lit square.
+                // (Hover glow is a separate group-hover layer below, since an
+                // inline box-shadow can't react to :hover.)
+                "inset 1px 1px 0 color-mix(in srgb, white 16%, transparent)",
+                "inset -1px -1px 1px color-mix(in srgb, black 48%, transparent)",
+                "0 0 0 1px var(--console-edge)",
+                "1px 1px 0 color-mix(in srgb, white 4%, transparent)",
+                "1px 2px 3px color-mix(in srgb, black 40%, transparent)",
+                "2px 4px 8px color-mix(in srgb, black 35%, transparent)",
               ].join(","),
         }}
       >
+        {/* Hover edge-light — a faint tone-coloured bloom that fades in when
+            the cap is hovered (and isn't already latched, which carries its
+            own glow). Pointer-events-none, sits under the icon. Gives the
+            "slight glow" + the sense the control is live on approach without
+            adding a permanent ring. */}
+        {!latched && !disabled && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+            style={{
+              borderRadius: "var(--console-cap-radius, 7px)",
+              boxShadow: `0 0 9px color-mix(in srgb, ${toneColor} 22%, transparent), inset 0 0 0 1px color-mix(in srgb, ${toneColor} 14%, transparent)`,
+            }}
+          />
+        )}
         {dot && (
           <span
             aria-hidden
-            className="absolute right-1.5 top-1.5 h-1 w-1 rounded-full transition-all duration-300"
+            className="absolute right-1.5 top-1.5 h-[3px] w-[3px] rounded-full transition-all duration-300"
             style={{
               background: active ? toneColor : "var(--color-ink-faint)",
               boxShadow: active
-                ? `0 0 4px color-mix(in srgb, ${toneColor} 85%, transparent)`
-                : "none",
+                ? `0 0 5px color-mix(in srgb, ${toneColor} 90%, transparent), 0 0 1px color-mix(in srgb, ${toneColor} 100%, transparent)`
+                : "inset 0 0 1px color-mix(in srgb, black 60%, transparent)",
             }}
           />
         )}
         {children}
-      </span>
+      </motion.span>
       {label != null && <RailLabel active={active}>{label}</RailLabel>}
     </button>
   );

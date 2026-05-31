@@ -221,6 +221,22 @@ export function Referenzen() {
                   </div>
                 ))}
               </dl>
+              {active.link && (
+                <a
+                  href={active.link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group mt-7 inline-flex items-baseline gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-muted transition-colors duration-500 hover:text-ink"
+                >
+                  <span className="relative">
+                    {active.link.label}
+                    <span className="pointer-events-none absolute inset-x-0 -bottom-0.5 h-px bg-ink/50 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]" />
+                  </span>
+                  <span aria-hidden className="text-ink-faint transition-transform duration-500 group-hover:translate-x-0.5">
+                    ↗
+                  </span>
+                </a>
+              )}
             </>
           )}
         </DialogContent>
