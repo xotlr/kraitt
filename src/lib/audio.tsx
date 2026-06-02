@@ -399,6 +399,13 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     const analyser = ctx.createAnalyser();
     analyser.fftSize = FFT_SIZE;
     analyser.smoothingTimeConstant = 0.5;
+    // Widen the dB window getByteFrequencyData maps to 0..255 a little past the
+    // default (-100..-30). The real EQ fix was the band edges (the upper bands
+    // were binning silence), but a modestly lower floor also lets the quieter
+    // upper-register bins lift off zero. Not too low (-120 would flutter on the
+    // noise floor during silent passages).
+    analyser.minDecibels = -110;
+    analyser.maxDecibels = -25;
     // The analyser is a metering TAP, never wired to destination. Each source
     // connects to it for analysis; only the MUSIC source also connects to
     // destination (so it's audible). The mic feeds the tap but not the
@@ -583,11 +590,37 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     const sampleRate = ctxRef.current?.sampleRate ?? 48000;
     const nyquist = sampleRate / 2;
     const binHz = nyquist / analyser.frequencyBinCount;
-    // Band edges in Hz
-    const bassEnd = 200;
-    const midEnd = 2000;
-    const bassEndBin = Math.floor(bassEnd / binHz);
+    // ── Band split tuned to the ACTUAL programme spectrum ─────────────────
+    // Measured energy map of the current track (warm close-mic'd Chopin piano,
+    // avg byte level per range): 60–200Hz≈118, 200–500≈94, 500–800≈86,
+    // 800–1500≈36, 1500–3000≈1, >3000≈0. ALL the energy is below ~1.5kHz — the
+    // recording has no real treble. So the old LO<200 / MID<2k / HI>2k split put
+    // HI entirely in DEAD AIR (it read 0 forever); a generic "perceptual" 2.5–8k
+    // HI band is just as empty. The honest fix is to split the three bars across
+    // the region that actually CARRIES signal, so each sits on real energy:
+    //   LO : 40–300 Hz   (fundamentals / low end)
+    //   MID: 300–700 Hz  (the body)
+    //   HI : 700–1600 Hz (the piano's upper register / brilliance — as high as
+    //                     this material goes; above that is silence we don't bin)
+    // If the track is ever swapped for something with real treble, widen hiEnd.
+    const loStart = 40,
+      loEnd = 300,
+      midEnd = 700,
+      hiEnd = 1600;
+    const loStartBin = Math.max(1, Math.floor(loStart / binHz));
+    const loEndBin = Math.floor(loEnd / binHz);
     const midEndBin = Math.floor(midEnd / binHz);
+    const hiEndBin = Math.min(
+      analyser.frequencyBinCount - 1,
+      Math.floor(hiEnd / binHz)
+    );
+    // Per-band makeup gain so the three bars read on a comparable scale. Energy
+    // falls off with frequency even within this range (118→86→36 across the
+    // bands), so HI gets the most lift. These scale what's there; silence still
+    // reads ~0 (no invented energy).
+    const LO_GAIN = 1.0,
+      MID_GAIN = 1.25,
+      HI_GAIN = 2.4;
 
     // Slow-moving baselines (one-pole IIR with very slow time constant).
     // We subtract these from instant readings so the level only spikes
@@ -634,22 +667,32 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       let bN = 0,
         mN = 0,
         hN = 0;
-      for (let i = 1; i < buf.length; i++) {
+      // Walk only the MUSICAL range (loStartBin..hiEndBin) — the dead sub-30Hz
+      // and >8kHz bins are skipped entirely so they can't drag a band's average
+      // to zero. Each bin is weighted by log(freq): octaves higher up cover more
+      // linear bins, so without log-weighting the wide upper octaves would still
+      // average thin. This makes each band reflect PERCEIVED (octave) energy.
+      for (let i = loStartBin; i <= hiEndBin; i++) {
         const v = buf[i] / 255;
-        if (i <= bassEndBin) {
-          bSum += v;
-          bN++;
+        // log weight grows with bin index so the sparse high bins still count;
+        // normalised by the same weight in the average (weighted mean).
+        const w = Math.log2(i + 1);
+        if (i <= loEndBin) {
+          bSum += v * w;
+          bN += w;
         } else if (i <= midEndBin) {
-          mSum += v;
-          mN++;
+          mSum += v * w;
+          mN += w;
         } else {
-          hSum += v;
-          hN++;
+          hSum += v * w;
+          hN += w;
         }
       }
-      const bass = bN ? bSum / bN : 0;
-      const mid = mN ? mSum / mN : 0;
-      const high = hN ? hSum / hN : 0;
+      // Weighted means × per-band makeup gain (clamped) so all three read on a
+      // comparable scale; silence still maps to ~0.
+      const bass = Math.min(1, (bN ? bSum / bN : 0) * LO_GAIN);
+      const mid = Math.min(1, (mN ? mSum / mN : 0) * MID_GAIN);
+      const high = Math.min(1, (hN ? hSum / hN : 0) * HI_GAIN);
 
       // ── METER signal (honest loudness, post-fade) ──────────────────────
       // True RMS of the WAVEFORM, not the FFT. getByteTimeDomainData gives the
@@ -728,8 +771,12 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       // the EQ applies the fader separately as a visual CEILING (segments above
       // the set volume render disabled), so we must NOT also scale by the fader
       // here or the level would be attenuated twice. BAND_DISPLAY_GAIN spreads
-      // quiet content up the column without pinning loud content.
-      const BAND_DISPLAY_GAIN = 1.9;
+      // quiet content up the column without pinning loud content. Lowered from
+      // 1.9 because the bands now carry their own per-band makeup gain (LO/MID/
+      // HI_GAIN above) that already balances + lifts them — a second ×1.9 on top
+      // pinned the (now boosted) HI bar to full. This is the overall display lift
+      // only; the per-band balance lives upstream.
+      const BAND_DISPLAY_GAIN = 1.15;
       const targets = [
         Math.min(1, bass * BAND_DISPLAY_GAIN),
         Math.min(1, mid * BAND_DISPLAY_GAIN),
