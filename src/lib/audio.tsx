@@ -153,6 +153,13 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   // DRY source so metering/shader read the true signal, not the reverb tail).
   const pannerRef = useRef<PannerNode | null>(null);
   const spatialBuiltRef = useRef(false);
+  // Head-tracking: the deviceorientation handler (so we can detach it) and a
+  // flag so we only wire it once. Maps device rotation → AudioListener so the
+  // 3D sound stays ANCHORED in space as the user turns their head/phone.
+  const orientHandlerRef = useRef<((e: DeviceOrientationEvent) => void) | null>(
+    null
+  );
+  const headTrackingRef = useRef(false);
 
   // Mic graph
   const micStreamRef = useRef<MediaStream | null>(null);
@@ -290,6 +297,194 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       });
     }
     return ir;
+  }, []);
+
+  // A gentle tanh saturation curve for the WaveShaper. Even/odd harmonics from
+  // soft clipping REGENERATE perceived high-frequency detail that MP3 encoding
+  // strips out — the ear reads the added harmonics as "air"/analog warmth the
+  // file no longer technically contains. `k` sets drive; kept low so it's warmth,
+  // not fizz. 4× oversampling in the node keeps the harmonics from aliasing.
+  const makeSaturationCurve = useCallback((k: number) => {
+    const n = 1024;
+    const curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 2 - 1; // -1..1
+      curve[i] = Math.tanh(k * x) / Math.tanh(k); // normalised soft clip
+    }
+    return curve;
+  }, []);
+
+  // Build the MASTERING chain — runs BEFORE the spatial chain. Fixes the source
+  // (a quiet, dull, MP3-compressed solo piano): high-pass rumble, cut the mud
+  // and add air (EQ), regenerate stripped treble (saturation), glue + lift
+  // (compressor), and catch peaks at the ceiling (limiter) so the loudness push
+  // never clips. Returns {input, output}. Restrained — small amounts of several
+  // stages, per the "restraint wins / match loudness" mastering discipline.
+  //   input → HPF → lowMudCut → airShelf → bodyBump → saturator
+  //         → compressor(glue) → limiter(brickwall) → output
+  const buildMasteringChain = useCallback(
+    (ctx: globalThis.AudioContext) => {
+      const input = ctx.createGain();
+
+      // High-pass ~35Hz — kill sub rumble that just eats headroom.
+      const hpf = ctx.createBiquadFilter();
+      hpf.type = "highpass";
+      hpf.frequency.value = 35;
+      hpf.Q.value = 0.7;
+
+      // Cut the "mud"/boxiness ~300Hz — the single move that opens up most
+      // amateur-sounding audio. A gentle wide dip.
+      const mudCut = ctx.createBiquadFilter();
+      mudCut.type = "peaking";
+      mudCut.frequency.value = 300;
+      mudCut.Q.value = 1.0;
+      mudCut.gain.value = -3.5;
+
+      // A small body bump ~80Hz so the low end stays warm after the mud cut.
+      const bodyBump = ctx.createBiquadFilter();
+      bodyBump.type = "peaking";
+      bodyBump.frequency.value = 80;
+      bodyBump.Q.value = 0.8;
+      bodyBump.gain.value = 2.0;
+
+      // High-shelf "air" boost ~11kHz for breath/sheen. The saturator below
+      // gives the harmonics for this shelf to lift (the raw file has ~nothing up
+      // here), so EQ + saturation work together to fake convincing air.
+      const airShelf = ctx.createBiquadFilter();
+      airShelf.type = "highshelf";
+      airShelf.frequency.value = 11000;
+      airShelf.gain.value = 4.5;
+
+      // Harmonic excitation — the "secret" stage for a dull MP3 source.
+      const saturator = ctx.createWaveShaper();
+      saturator.curve = makeSaturationCurve(1.6);
+      saturator.oversample = "4x";
+
+      // Glue compressor — moderate ratio, slowish attack: pulls quiet bits up,
+      // loud bits down, so the track feels full, present and "produced".
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -22;
+      comp.knee.value = 26;
+      comp.ratio.value = 3;
+      comp.attack.value = 0.02;
+      comp.release.value = 0.25;
+
+      // Make-up + drive into the limiter — this is the loudness push (step 1).
+      const drive = ctx.createGain();
+      drive.gain.value = 1.9;
+
+      // Brickwall limiter — high ratio, fast attack, ceiling near 0dB so the
+      // loudness push above NEVER clips. A second compressor as a peak catch.
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -1.5;
+      limiter.knee.value = 0;
+      limiter.ratio.value = 20;
+      limiter.attack.value = 0.001;
+      limiter.release.value = 0.05;
+
+      const output = ctx.createGain();
+      // Trim back a touch so the master sits hot but not slammed (and so the
+      // spatial dry/wet split downstream has headroom).
+      output.gain.value = 0.85;
+
+      input
+        .connect(hpf);
+      hpf.connect(mudCut);
+      mudCut.connect(bodyBump);
+      bodyBump.connect(airShelf);
+      airShelf.connect(saturator);
+      saturator.connect(comp);
+      comp.connect(drive);
+      drive.connect(limiter);
+      limiter.connect(output);
+
+      return { input, output };
+    },
+    [makeSaturationCurve]
+  );
+
+  // Head-tracking: feed the device's orientation into the AudioListener so the
+  // spatial sound stays ANCHORED in the room — turn your head/phone and the
+  // source that was in front is now to your side, like a real object. Maps the
+  // DeviceOrientationEvent (alpha=compass yaw, beta=front/back pitch, gamma=
+  // left/right roll) to the listener's forward + up vectors, counter-rotating
+  // the world against the head. Degrades silently: no sensor → no events → the
+  // listener keeps its default forward orientation (the orbit still works). On
+  // iOS, motion needs an explicit permission request after a user gesture —
+  // we're inside the play tap when this runs, so the prompt is allowed.
+  const setupHeadTracking = useCallback((ctx: globalThis.AudioContext) => {
+    if (headTrackingRef.current) return;
+    if (typeof window === "undefined" || !window.DeviceOrientationEvent) return;
+    headTrackingRef.current = true;
+
+    const listener = ctx.listener;
+    const deg2rad = Math.PI / 180;
+
+    const handler = (e: DeviceOrientationEvent) => {
+      if (e.alpha == null || e.beta == null || e.gamma == null) return;
+      const a = e.alpha * deg2rad; // yaw (around vertical)
+      const b = e.beta * deg2rad; // pitch (front/back tilt)
+      const g = e.gamma * deg2rad; // roll (left/right tilt)
+
+      // Forward vector from yaw+pitch. We want the WORLD to counter-rotate, so
+      // the listener "looks" in the direction the device faces; the panner's
+      // fixed source position then appears to move opposite the head turn.
+      const cb = Math.cos(b);
+      const fx = Math.sin(a) * cb;
+      const fy = -Math.sin(b);
+      const fz = -Math.cos(a) * cb;
+      // Up vector, rolled by gamma.
+      const ux = Math.sin(g) * Math.cos(a);
+      const uy = Math.cos(g);
+      const uz = Math.sin(g) * Math.sin(a);
+
+      // Newer API: AudioListener.forwardX/…; older: setOrientation(). Support both.
+      if (listener.forwardX) {
+        listener.forwardX.value = fx;
+        listener.forwardY.value = fy;
+        listener.forwardZ.value = fz;
+        listener.upX.value = ux;
+        listener.upY.value = uy;
+        listener.upZ.value = uz;
+      } else if (
+        (listener as unknown as { setOrientation?: unknown }).setOrientation
+      ) {
+        (
+          listener as unknown as {
+            setOrientation: (
+              fx: number,
+              fy: number,
+              fz: number,
+              ux: number,
+              uy: number,
+              uz: number
+            ) => void;
+          }
+        ).setOrientation(fx, fy, fz, ux, uy, uz);
+      }
+    };
+
+    const attach = () => {
+      window.addEventListener("deviceorientation", handler);
+      orientHandlerRef.current = handler;
+    };
+
+    // iOS 13+ gates motion behind a permission prompt that must follow a user
+    // gesture. requestPermission exists only there; elsewhere just attach.
+    const DOE = window.DeviceOrientationEvent as unknown as {
+      requestPermission?: () => Promise<"granted" | "denied">;
+    };
+    if (typeof DOE.requestPermission === "function") {
+      DOE.requestPermission()
+        .then((state) => {
+          if (state === "granted") attach();
+        })
+        .catch(() => {
+          /* denied / unavailable → no head-tracking, spatial orbit still runs */
+        });
+    } else {
+      attach();
+    }
   }, []);
 
   // Build the spatial chain and return its ENTRY node (what the source connects
@@ -445,26 +640,36 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       void decodeWaveform(ctx);
       const src = ctx.createMediaElementSource(el);
       // Music graph. The metering tap ALWAYS reads the DRY source (so the VU,
-      // EQ and shader see the true signal, not the reverb tail):
+      // EQ and shader see the true PRE-master signal — the meter shows the
+      // source's real loudness/spectrum, not the post-limiter master):
       src.connect(analyserRef.current!);
 
-      // Audible path. On capable displays (desktop, motion allowed) it runs
-      // through the spatial "Dolby-like" chain (widen → hall → HRTF orbit);
-      // otherwise it's the plain direct connection. Built once. Reduced-motion
-      // and mobile keep the dry, cheap path so the perf gates hold and the
-      // effect never plays where it can't be heard / shouldn't run.
+      // Audible path:
+      //   src → MASTERING (EQ/saturation/compression/limiter) → [spatial] → out
+      // The MASTERING chain runs for EVERYONE (it fixes the dull, quiet MP3 —
+      // loudness + air + body benefit phone speakers too). Only the SPATIAL
+      // chain (widen/hall/HRTF orbit) is desktop + motion gated, since it's CPU
+      // and mainly reads on headphones. Built once; any failure falls back to a
+      // direct connection so audio always plays.
       const allowSpatial =
         typeof window !== "undefined" &&
         window.matchMedia("(min-width: 1024px)").matches &&
         !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (allowSpatial && !spatialBuiltRef.current) {
+      if (!spatialBuiltRef.current) {
         try {
-          const entry = buildSpatialChain(ctx);
-          src.connect(entry);
+          const master = buildMasteringChain(ctx);
+          src.connect(master.input);
+          if (allowSpatial) {
+            const entry = buildSpatialChain(ctx);
+            master.output.connect(entry);
+            // Anchor the spatial field to the user's head where a sensor exists.
+            setupHeadTracking(ctx);
+          } else {
+            master.output.connect(ctx.destination);
+          }
           spatialBuiltRef.current = true;
         } catch {
-          // Any node-construction failure → fall back to a direct connection so
-          // audio still plays.
+          // Node-construction failure → plain direct connection.
           src.connect(ctx.destination);
         }
       } else {
@@ -545,6 +750,11 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       }
       micStreamRef.current?.getTracks().forEach((t) => t.stop());
       micStreamRef.current = null;
+      // Detach the head-tracking orientation listener.
+      if (orientHandlerRef.current) {
+        window.removeEventListener("deviceorientation", orientHandlerRef.current);
+        orientHandlerRef.current = null;
+      }
       void ctxRef.current?.close();
       ctxRef.current = null;
     };
