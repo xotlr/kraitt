@@ -603,14 +603,22 @@ export function Terrain() {
     (u.uDir.value as THREE.Vector2).set(dir.x, dir.y);
 
     // ---- RADIAL PULSE TRIGGER ----
-    // Two ways to launch the expanding ring:
-    //   1. A bass ONSET — bass surged this frame and is loud enough.
-    //   2. A MANUAL pluck — a console button bumped levels.pulse while no
-    //      audio is playing, so a click ripples the surface itself.
-    // Either fires only when no ring is already in flight, so one
-    // beat/click = one clean ring rather than a per-frame retrigger.
+    // Three ways to launch the expanding ring:
+    //   1. A real NOTE ONSET — Meyda's spectral-energy-rise feature
+    //      (levels.onset) spiked, i.e. an actual attack in the music. This is
+    //      the *musical* trigger: it fires on note hits, not just loudness, so a
+    //      soft legato piano still ripples on its phrasing rather than only on
+    //      bass swells.
+    //   2. A bass surge — the older loudness heuristic, kept as a fallback for
+    //      material where the onset feature is quiet (and for the mic path,
+    //      which has no Meyda extraction).
+    //   3. A MANUAL pluck — a console button bumped levels.pulse while no audio
+    //      is playing, so a click ripples the surface itself.
+    // Fires only when no ring is already in flight, so one hit = one clean ring.
     const bassNow = levels.current.bass;
-    const onset = bassNow - prevBass.current > 0.18 && bassNow > 0.35;
+    const noteOnset = levels.current.onset > 0.22;
+    const bassSurge = bassNow - prevBass.current > 0.18 && bassNow > 0.35;
+    const onset = noteOnset || bassSurge;
     const plucked = levels.current.pulse !== seenPulse.current;
     seenPulse.current = levels.current.pulse;
     if ((onset || plucked) && !pulseActive.current) {

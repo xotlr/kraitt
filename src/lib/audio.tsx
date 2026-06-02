@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import Meyda from "meyda";
 
 /**
  * Audio plumbing: one AudioContext, one shared AnalyserNode reading FFT
@@ -108,6 +109,16 @@ type LevelsRef = {
   bassLevel: number;
   midLevel: number;
   highLevel: number;
+  /** MUSICAL features from the Meyda AudioWorklet (off-main-thread), 0..1.
+   *  These drive *musical* reactivity instead of raw loudness:
+   *  - `onset`: a transient/attack pulse — spikes on a note ATTACK (spectral-
+   *    flux rise), decays fast. A real beat-hit signal, not a loudness ramp.
+   *  - `centroid`: spectral centroid = timbre/brightness (low = dark/bassy,
+   *    high = bright/airy). The scene can shift hue/character with it.
+   *  Both stay 0 when the worklet isn't running (mobile / unsupported / no
+   *  music), so consumers that read them degrade to their loudness behaviour. */
+  onset: number;
+  centroid: number;
 };
 const LevelsContext = createContext<{ current: LevelsRef } | null>(null);
 
@@ -236,6 +247,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     bassLevel: 0,
     midLevel: 0,
     highLevel: 0,
+    onset: 0,
+    centroid: 0,
   });
 
   // Manual pluck — bumps the pulse counter the shader watches. useCallback
@@ -243,6 +256,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const triggerPulse = useCallback(() => {
     levelsRef.current.pulse += 1;
   }, []);
+
 
   // Seek to a 0..1 fraction of the track. The transport scrubber calls this on
   // drag/tap. No-op until the element exists (created on first play).
@@ -547,9 +561,12 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         lv.bassLevel *= 1 - 0.12;
         lv.midLevel *= 1 - 0.12;
         lv.highLevel *= 1 - 0.12;
+        // Musical features ease home too (the worklet stops posting when paused).
+        lv.onset *= 1 - 0.2;
+        lv.centroid *= 1 - 0.05;
         if (
           lv.bass + lv.mid + lv.high + lv.rms +
-            lv.bassLevel + lv.midLevel + lv.highLevel >
+            lv.bassLevel + lv.midLevel + lv.highLevel + lv.onset >
           0.001
         ) {
           raf = requestAnimationFrame(tick);
@@ -597,6 +614,18 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     // when the spatial chain exists (desktop, motion allowed); otherwise a no-op.
     let orbitPhase = 0;
 
+    // ── Meyda musical-feature extraction (main thread, pure extract) ─────────
+    // Real descriptors, not loudness: spectralFlux → onset (a RISE in flux is a
+    // note ATTACK), spectralCentroid → timbre/brightness. We feed Meyda the same
+    // time-domain frame the meter reads (wave is power-of-2, fftSize long), so
+    // this adds one pure FFT per frame and NO extra audio node. Meyda.extract is
+    // a pure function over a Float32 signal — no ScriptProcessor, no jank node.
+    Meyda.bufferSize = wave.length; // fftSize, power of 2
+    Meyda.sampleRate = sampleRate;
+    const signal = new Float32Array(wave.length);
+    let prevFlux = 0; // previous-frame energy (rms), for the onset rise
+    let onsetBaseline = 0; // running energy baseline the rise is measured against
+
     const tick = () => {
       analyser.getByteFrequencyData(buf);
       let bSum = 0,
@@ -634,9 +663,43 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       let peakSample = 0;
       for (let i = 0; i < wave.length; i++) {
         const s = (wave[i] - 128) / 128; // -1..1
+        signal[i] = s; // same frame, reused for Meyda extraction below
         sumSq += s * s;
         const abs = s < 0 ? -s : s;
         if (abs > peakSample) peakSample = abs;
+      }
+
+      // Meyda musical features off this frame. We extract SINGLE-FRAME-safe
+      // descriptors only — spectralCentroid (brightness/timbre) and rms — and
+      // derive ONSET ourselves from the frame-to-frame RISE in energy (a
+      // positive-difference flux). Meyda's own `spectralFlux` extractor needs a
+      // previousSignal the bare static extract() can't supply (it throws), so we
+      // compute the flux here. Wrapped so a bad frame can't kill the tick.
+      try {
+        const feat = Meyda.extract(["spectralCentroid", "rms"], signal);
+        if (feat && typeof feat === "object") {
+          const f = feat as { spectralCentroid?: number; rms?: number };
+          const lvF = levelsRef.current;
+          // Centroid normalised over the half-spectrum, lightly smoothed.
+          const cN = Math.min(1, (f.spectralCentroid ?? 0) / (wave.length / 2));
+          lvF.centroid += (cN - lvF.centroid) * 0.2;
+          // Onset = the RELATIVE positive rise in frame energy. We normalise the
+          // rise by a running energy baseline so even the GENTLE attacks of a
+          // soft legato piano register (an absolute-delta threshold misses them —
+          // the nocturne's notes barely jump the raw rms). A fast-rising,
+          // slow-falling baseline tracks the local level; (e - prev)/baseline is
+          // the fractional jump, which a note onset spikes regardless of overall
+          // loudness. Gained and clamped to a usable 0..1 trigger.
+          const e = f.rms ?? 0;
+          onsetBaseline += (e - onsetBaseline) * (e > onsetBaseline ? 0.4 : 0.04);
+          const rise = e - prevFlux;
+          const rel = onsetBaseline > 1e-4 ? rise / onsetBaseline : 0;
+          const onsetPulse = Math.min(1, Math.max(0, rel) * 2.2);
+          prevFlux = e;
+          lvF.onset = Math.max(onsetPulse, lvF.onset);
+        }
+      } catch {
+        // A bad frame → skip; the scene keeps its loudness reactivity.
       }
       const rmsLinear = Math.sqrt(sumSq / wave.length); // 0..~1
       // Map linear RMS → meter throw. Real (compressed) music sits around
@@ -708,6 +771,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         reactiveHigh > lv.high
           ? lv.high + (reactiveHigh - lv.high) * ATTACK
           : lv.high + (reactiveHigh - lv.high) * RELEASE;
+
+      // Onset decays each frame so it falls smoothly between worklet messages
+      // (the worklet SNAPS it up on an attack; this is the fall). centroid holds.
+      lv.onset *= 0.9;
 
       // ── 3D orbit: move the music around the listener (binaural) ──────────
       const panner = pannerRef.current;
