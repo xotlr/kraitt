@@ -11,6 +11,7 @@ import { useAudio } from "@/lib/audio";
 import { useLanguage } from "@/lib/language-context";
 import { dict } from "@/lib/i18n";
 import type { Dict } from "@/lib/i18n";
+import { EASE } from "@/lib/motion";
 
 /**
  * ConsolePanel — the mobile console. Below lg the same controls fold into
@@ -33,7 +34,7 @@ export function ConsolePanel() {
       aria-label="Konsole"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 1.2, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 1.2, delay: 0.5, ease: EASE }}
       className="lg:hidden fixed bottom-0 left-0 right-0 z-40 pointer-events-auto px-[var(--gutter)] pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 select-none"
     >
       <div className="flex items-center justify-between gap-3 overflow-x-auto">
@@ -68,7 +69,7 @@ export function ConsolePanel() {
               dot
               size={42}
               disabled={musicStatus === "unavailable"}
-              onClick={toggleMusic}
+              onClick={() => void toggleMusic()}
               ariaLabel={
                 musicStatus === "unavailable" ? c.musicUnavailable : c.music
               }
@@ -84,7 +85,7 @@ export function ConsolePanel() {
               tone="rec"
               dot
               size={42}
-              onClick={toggleMic}
+              onClick={() => void toggleMic()}
               ariaLabel={c.mic}
             >
               <Microphone size={19} weight={micOn ? "fill" : "regular"} />

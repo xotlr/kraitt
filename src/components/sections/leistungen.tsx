@@ -82,7 +82,7 @@ export function Leistungen() {
                         className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-hairline"
                       />
                     )}
-                    <span className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-ink/40 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]" />
+                    <span className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-ink/40 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-700 ease-out-soft" />
                   </motion.li>
                 ))}
               </ul>

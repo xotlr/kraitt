@@ -6,14 +6,25 @@ import type { Page } from "@playwright/test";
  * production bundle stays clean.
  */
 
+// The page has three <canvas> elements: the three.js scene canvas and two
+// aria-hidden grain-overlay canvases (page-wide + island-scoped). Everything
+// here must instrument the SCENE canvas, which three.js stamps with
+// data-engine — the grain canvases carry a 2D context and none of the scene's
+// draw calls, so a bare querySelector("canvas") would grab the wrong one.
+const SCENE_CANVAS = "canvas[data-engine]";
+
 /** Wait until the scene's <canvas> exists and has a non-zero backing store. */
 export async function waitForScene(page: Page): Promise<void> {
-  await page.waitForSelector("canvas", { state: "attached", timeout: 15_000 });
+  await page.waitForSelector(SCENE_CANVAS, {
+    state: "attached",
+    timeout: 15_000,
+  });
   await page.waitForFunction(
-    () => {
-      const c = document.querySelector("canvas");
-      return !!c && c.width > 0 && c.height > 0;
+    (sel) => {
+      const c = document.querySelector(sel);
+      return !!c && (c as HTMLCanvasElement).width > 0 && (c as HTMLCanvasElement).height > 0;
     },
+    SCENE_CANVAS,
     { timeout: 15_000 }
   );
 }
@@ -29,7 +40,9 @@ export async function measureRenderRate(
   ms: number
 ): Promise<{ drawArrays: number; rafs: number }> {
   return page.evaluate(async (duration) => {
-    const c = document.querySelector("canvas") as HTMLCanvasElement;
+    const c = document.querySelector(
+      "canvas[data-engine]"
+    ) as HTMLCanvasElement;
     const gl = (c.getContext("webgl2") ||
       c.getContext("webgl")) as WebGLRenderingContext | null;
     if (!gl) return { drawArrays: -1, rafs: -1 };

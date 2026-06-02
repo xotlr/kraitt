@@ -85,16 +85,15 @@ gate needs an explicit justification.
 
 ## Pre-deploy checklist
 
-**Audio asset is unlicensed.** `/public/audio/ambient.mp3` is currently
-expected to be a track from the *Clair Obscur: Expedition 33* OST
-("Une Vie à t'Aimer"), used as a development-only placeholder. This is
-© Sandfall Interactive / Lorien Testard. **It MUST be replaced before
-any public deploy** with either:
+**Audio asset is license-cleared.** `/public/audio/ambient.mp3` is Chopin's
+Nocturne in F minor Op. 55 No. 1 (perf. Luke Faulkner via Musopen) — a **CC0 /
+public-domain-dedicated recording** (the performance itself, not just the
+composition), cleared for public deploy with no attribution required.
+Provenance + license live in `public/audio/LICENSE.json`, enforced by
+`tests/audio-license.spec.ts` (the gate fails if `cleared` is ever flipped back
+to `false`). Referenced from `src/lib/audio.tsx` (the `MUSIC_SRC` constant).
 
-- a public-domain recording (e.g. IMSLP performance-PD entries), or
-- a properly licensed track (paid commercial license or CC-BY with
-  attribution rendered somewhere on the site), or
-- silence — remove the music toggle entirely, keep only the mic input
-
-Referenced from `src/lib/audio.tsx` (the `MUSIC_SRC` constant and the
-comment above it).
+If the track is ever swapped again, keep the gate honest: only set
+`cleared: true` for a genuinely PD / CC0 / properly-licensed file (and if the
+new license requires attribution, render it on the site and fill in
+`attributionText`).

@@ -63,7 +63,7 @@ export function useScramble<T extends HTMLElement>(text: string) {
     cancelAnimationFrame(raf.current);
     startRef.current = performance.now();
     // Per-character last-glyph memory so each slot's cycle doesn't stutter.
-    const prev = new Array(full.length).fill("");
+    const prev: string[] = new Array<string>(full.length).fill("");
 
     const tick = (now: number) => {
       const elapsed = now - startRef.current;

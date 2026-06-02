@@ -23,7 +23,11 @@ test.describe("scene performance gates", () => {
     // Cost of ONE rendered frame (postfx pass count), measured by forcing a
     // single frame — keeps the rest independent of the exact effect stack.
     const passesPerFrame = await page.evaluate(async () => {
-      const c = document.querySelector("canvas") as HTMLCanvasElement;
+      // The scene canvas specifically — see helpers.ts SCENE_CANVAS note (two
+      // grain-overlay canvases also exist).
+      const c = document.querySelector(
+        "canvas[data-engine]"
+      ) as HTMLCanvasElement;
       const gl = (c.getContext("webgl2") ||
         c.getContext("webgl")) as WebGLRenderingContext;
       let n = 0;
@@ -57,7 +61,7 @@ test.describe("scene performance gates", () => {
     expect(rafs).toBeGreaterThan(8);
   });
 
-  test("hidden tab pauses the render loop", async ({ page, context }) => {
+  test("hidden tab pauses the render loop", async ({ page }) => {
     await page.goto("/");
     await waitForScene(page);
     await page.waitForTimeout(500);

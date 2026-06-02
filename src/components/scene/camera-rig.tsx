@@ -1,9 +1,9 @@
 "use client";
 
 import { useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import * as THREE from "three";
-import { useScrollViewport } from "@/lib/scroll-context";
+import { useScrollProgress } from "@/lib/scroll-context";
 
 /**
  * Scroll-driven camera zoom. As the user scrolls DOWN the page, the
@@ -29,31 +29,12 @@ const BOTTOM_LOOK = new THREE.Vector3(0, -0.4, -2.5);
 
 export function CameraRig() {
   const camera = useThree((s) => s.camera);
-  const viewportRef = useScrollViewport();
 
-  const targetProgress = useRef(0);
+  // Live scroll progress (0..1), read in useFrame without re-rendering.
+  const targetProgress = useScrollProgress();
   const currentProgress = useRef(0);
   const posScratch = useRef(new THREE.Vector3());
   const lookScratch = useRef(new THREE.Vector3());
-
-  useEffect(() => {
-    const update = () => {
-      const el = viewportRef.current;
-      if (!el) return;
-      const max = el.scrollHeight - el.clientHeight;
-      targetProgress.current = max > 0 ? el.scrollTop / max : 0;
-    };
-    const id = requestAnimationFrame(() => {
-      update();
-      const el = viewportRef.current;
-      if (el) el.addEventListener("scroll", update, { passive: true });
-    });
-    return () => {
-      cancelAnimationFrame(id);
-      const el = viewportRef.current;
-      if (el) el.removeEventListener("scroll", update);
-    };
-  }, [viewportRef]);
 
   useFrame(() => {
     // Low-pass smooth so scroll doesn't snap the camera.

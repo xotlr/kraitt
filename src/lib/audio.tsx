@@ -99,12 +99,12 @@ const LevelsContext = createContext<{ current: LevelsRef } | null>(null);
 const FFT_SIZE = 1024; // 512 usable bins; cheap, plenty for 3 bands
 const ATTACK = 0.55; // 0..1 — higher = snappier on transients
 const RELEASE = 0.08; // 0..1 — higher = faster decay back to 0
-// Audio file path. Currently expected to be "Une Vie à t'Aimer" from
-// the Clair Obscur: Expedition 33 OST — used as a DEVELOPMENT-ONLY
-// placeholder. This file is © Sandfall Interactive / Lorien Testard
-// and is NOT licensed for redistribution. Before any public deploy:
-// replace with a track that is either public domain or properly
-// licensed. See also: CLAUDE.md "Pre-deploy checklist".
+// Audio file path. Chopin, Nocturne in F minor Op. 55 No. 1 (perf. Luke
+// Faulkner, via Musopen) — a CC0 / public-domain-dedicated recording, cleared
+// for public deploy. The recording itself is PD, not just the composition.
+// Provenance + license live in public/audio/LICENSE.json, which the
+// tests/audio-license.spec.ts gate enforces. See also: CLAUDE.md "Pre-deploy
+// checklist".
 const MUSIC_SRC = "/audio/ambient.mp3";
 
 export function AudioProvider({ children }: { children: ReactNode }) {

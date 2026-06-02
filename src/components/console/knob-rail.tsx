@@ -18,6 +18,7 @@ import { useScrollTo } from "@/lib/scroll-context";
 import { useLanguage } from "@/lib/language-context";
 import { dict } from "@/lib/i18n";
 import type { Dict } from "@/lib/i18n";
+import { EASE } from "@/lib/motion";
 
 /**
  * KnobRail — the RIGHT console column: ALL the tactile controls. The LEFT
@@ -36,7 +37,7 @@ const rail: Variants = {
 };
 const item: Variants = {
   hidden: { opacity: 0, x: 14 },
-  show: { opacity: 1, x: 0, transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] } },
+  show: { opacity: 1, x: 0, transition: { duration: 0.7, ease: EASE } },
 };
 
 export function KnobRail() {
@@ -96,7 +97,7 @@ export function KnobRail() {
             tone="play"
             dot
             disabled={musicStatus === "unavailable"}
-            onClick={toggleMusic}
+            onClick={() => void toggleMusic()}
             ariaLabel={
               musicStatus === "unavailable" ? c.musicUnavailable : c.music
             }
@@ -111,7 +112,7 @@ export function KnobRail() {
             active={micOn}
             tone="rec"
             dot
-            onClick={toggleMic}
+            onClick={() => void toggleMic()}
             ariaLabel={c.mic}
           >
             <Microphone size={19} weight={micOn ? "fill" : "regular"} />

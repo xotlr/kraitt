@@ -24,7 +24,10 @@ test("scene bed stays OLED-black (brand invariant)", async ({ page }) => {
   // terrain sits low). On the dark theme this must be near-black — the contour
   // crests are bright but sparse, so a top patch's mean stays in the floor.
   const meanLuma = await page.evaluate(() => {
-    const c = document.querySelector("canvas") as HTMLCanvasElement;
+    // Scene canvas only — the grain overlays would give a meaningless read.
+    const c = document.querySelector(
+      "canvas[data-engine]"
+    ) as HTMLCanvasElement;
     const gl = (c.getContext("webgl2") ||
       c.getContext("webgl")) as WebGLRenderingContext | null;
     if (!gl) return -1;
@@ -56,7 +59,12 @@ test("console chrome frames the screen", async ({ page }) => {
   // three are present and the rails sit on either side of the screen — the
   // monitor framing the whole design depends on. Using bounding boxes keeps
   // this robust to the live content inside each region.
-  const canvas = page.locator("canvas");
+  //
+  // Target the three.js scene canvas specifically via [data-engine] — there
+  // are also two aria-hidden grain-overlay <canvas> elements (page-wide +
+  // island-scoped), so a bare locator('canvas') is ambiguous. The scene canvas
+  // is the "screen" whose box the rail-position assertions below depend on.
+  const canvas = page.locator("canvas[data-engine]");
   await expect(canvas).toBeVisible();
 
   const nav = page.getByRole("navigation", { name: "Sektionen" });

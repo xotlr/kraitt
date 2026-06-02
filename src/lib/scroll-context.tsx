@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   type ReactNode,
   type RefObject,
@@ -40,6 +41,52 @@ export function useScrollViewport(): RefObject<HTMLDivElement | null> {
     throw new Error("useScrollViewport must be used inside ScrollProvider");
   }
   return ctx.viewportRef;
+}
+
+/**
+ * Live scroll progress (0..1) off the ScrollArea viewport, throttled to one
+ * rAF per scroll burst — the single source of the `scrollTop / (scrollHeight -
+ * clientHeight)` math the gauge and the camera both need. Returns a ref so a
+ * useFrame/rAF reader can poll it without re-rendering; pass `onChange` to also
+ * be called each update (e.g. to drive React state). No work runs while the
+ * page isn't scrolling, so this respects the frame-budget gates.
+ *
+ * `onChange` is held in a ref, so callers may pass an inline closure without
+ * re-subscribing the listener every render.
+ */
+export function useScrollProgress(
+  onChange?: (progress: number) => void
+): RefObject<number> {
+  const viewportRef = useScrollViewport();
+  const progress = useRef(0);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+
+    let raf: number | null = null;
+    const read = () => {
+      raf = null;
+      const max = vp.scrollHeight - vp.clientHeight;
+      const p = max > 0 ? vp.scrollTop / max : 0;
+      progress.current = p;
+      onChangeRef.current?.(p);
+    };
+    const onScroll = () => {
+      if (raf == null) raf = requestAnimationFrame(read);
+    };
+
+    read();
+    vp.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      vp.removeEventListener("scroll", onScroll);
+      if (raf != null) cancelAnimationFrame(raf);
+    };
+  }, [viewportRef]);
+
+  return progress;
 }
 
 /**

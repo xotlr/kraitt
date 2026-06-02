@@ -221,7 +221,7 @@ html.light {
 @layer base {
   :root {
     color-scheme: dark;
-    --transition-theme: 450ms cubic-bezier(0.22, 1, 0.36, 1);
+    --transition-theme: 450ms var(--ease-out-soft);
     transition:
       --color-canvas var(--transition-theme),
       --color-bezel var(--transition-theme),

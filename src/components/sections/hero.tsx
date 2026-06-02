@@ -6,6 +6,7 @@ import { useScrollTo } from "@/lib/scroll-context";
 import { useAudioGlow } from "@/hooks/use-audio-glow";
 import { useLanguage } from "@/lib/language-context";
 import { dict } from "@/lib/i18n";
+import { EASE } from "@/lib/motion";
 
 // The hero has NO load-in animation — it renders static (the user asked to
 // drop the slide/fade reveals). The only motion left is the dot's hover.
@@ -70,7 +71,7 @@ export function Hero() {
                 only interactive flourish on the hero. */}
             <motion.span
               whileHover={{ scale: 1.15 }}
-              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ duration: 0.4, ease: EASE }}
               className="inline-block text-[color:var(--color-string)] origin-bottom"
               aria-hidden
             >

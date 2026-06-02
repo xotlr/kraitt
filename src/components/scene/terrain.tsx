@@ -548,7 +548,7 @@ export function Terrain() {
     // Horizon haze tint follows the eased theme between the atmosphere's
     // dark bed (#000) and its paper bed (#f2f1ef ≈ 0.949,0.945,0.937), so
     // far terrain dissolves into whatever the background actually is.
-    const fog = u.uFogColor.value;
+    const fog = u.uFogColor.value as THREE.Color;
     const m = themeMix.current;
     fog.setRGB(0.949 * m, 0.945 * m, 0.937 * m);
 

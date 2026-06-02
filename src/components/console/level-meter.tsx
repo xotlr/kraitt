@@ -164,7 +164,7 @@ export function ChannelStrip() {
           style={{
             height: `calc(${SLOT_PAD}px + ${volume} * (100% - ${SLOT_PAD * 2}px))`,
             background: `linear-gradient(180deg, transparent 0%, color-mix(in srgb, ${faderZone} 14%, transparent) 100%)`,
-            transition: "height 110ms cubic-bezier(0.22,1,0.36,1), background 200ms",
+            transition: "height 110ms var(--ease-out-soft), background 200ms",
           }}
         />
 
@@ -195,7 +195,7 @@ export function ChannelStrip() {
                 ].join(","),
             transform: grabbed ? "translateY(0.5px)" : "translateY(0)",
             transition:
-              "bottom 110ms cubic-bezier(0.22,1,0.36,1), box-shadow 120ms, transform 120ms",
+              "bottom 110ms var(--ease-out-soft), box-shadow 120ms, transform 120ms",
           }}
         >
           {/* Grip line + a thin tone edge along the top so the handle reads as

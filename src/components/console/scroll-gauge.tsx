@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useScrollViewport } from "@/lib/scroll-context";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useScrollProgress, useScrollViewport } from "@/lib/scroll-context";
 import { cn } from "@/lib/utils";
 
 /**
@@ -41,29 +41,9 @@ export function ScrollGauge({
   const viewportRef = useScrollViewport();
   const [pct, setPct] = useState(0);
   const scrubbing = useRef(false);
-  const rafRef = useRef<number | null>(null);
 
-  // Track live scroll position → percent.
-  useEffect(() => {
-    const vp = viewportRef.current;
-    if (!vp) return;
-
-    const read = () => {
-      rafRef.current = null;
-      const max = vp.scrollHeight - vp.clientHeight;
-      setPct(max > 0 ? (vp.scrollTop / max) * 100 : 0);
-    };
-    const onScroll = () => {
-      if (rafRef.current == null) rafRef.current = requestAnimationFrame(read);
-    };
-
-    read();
-    vp.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      vp.removeEventListener("scroll", onScroll);
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
-    };
-  }, [viewportRef]);
+  // Track live scroll position → percent (shared rAF-throttled progress).
+  useScrollProgress(useCallback((p: number) => setPct(p * 100), []));
 
   // Drag-to-scrub (right gauge only) + wheel forwarding (both gauges). The
   // gauge is an overlay SIBLING of the scroll viewport, so wheel/drag over it

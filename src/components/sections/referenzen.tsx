@@ -164,7 +164,7 @@ export function Referenzen() {
                       {p.year}
                     </span>
 
-                    <span className="pointer-events-none absolute inset-x-0 -bottom-px h-px bg-ink/50 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]" />
+                    <span className="pointer-events-none absolute inset-x-0 -bottom-px h-px bg-ink/50 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-700 ease-out-soft" />
                   </button>
                   <motion.span
                     variants={drawX}
@@ -209,7 +209,7 @@ export function Referenzen() {
                 >
                   <span className="relative">
                     {active.link.label}
-                    <span className="pointer-events-none absolute inset-x-0 -bottom-0.5 h-px bg-ink/50 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]" />
+                    <span className="pointer-events-none absolute inset-x-0 -bottom-0.5 h-px bg-ink/50 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-500 ease-out-soft" />
                   </span>
                   <span aria-hidden className="text-ink-faint transition-transform duration-500 group-hover:translate-x-0.5">
                     ↗

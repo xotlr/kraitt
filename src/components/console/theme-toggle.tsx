@@ -4,6 +4,7 @@ import { Moon, Sun } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { StudioButton } from "@/components/console/studio-button";
 import { useTheme } from "@/lib/theme-context";
+import { EASE } from "@/lib/motion";
 
 /**
  * ThemeToggle — the light/dark switch as a console button. Shows a Moon
@@ -28,7 +29,7 @@ export function ThemeToggle({ iconSize = 20 }: { iconSize?: number }) {
           initial={{ opacity: 0, rotate: -40, scale: 0.7 }}
           animate={{ opacity: 1, rotate: 0, scale: 1 }}
           exit={{ opacity: 0, rotate: 40, scale: 0.7 }}
-          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.3, ease: EASE }}
           className="inline-flex"
         >
           {dark ? (

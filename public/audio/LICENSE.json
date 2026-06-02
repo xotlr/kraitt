@@ -1,9 +1,9 @@
 {
-  "$comment": "Declares the licensing status of ambient.mp3. The license-gate test (tests/audio-license.spec.ts) FAILS while cleared=false, so the unlicensed placeholder cannot ship silently. Before deploy: replace ambient.mp3 with a PD / properly-licensed / silent track, then set cleared=true and fill in source + license.",
+  "$comment": "Declares the licensing status of ambient.mp3. The license-gate test (tests/audio-license.spec.ts) FAILS while cleared=false, so an unlicensed track cannot ship silently. This is now a CC0 public-domain-dedicated recording, so cleared=true is honest.",
   "file": "ambient.mp3",
-  "cleared": false,
-  "source": "Clair Obscur: Expedition 33 OST — 'Une Vie à t'Aimer' (Sandfall Interactive / Lorien Testard)",
-  "license": "© All rights reserved — DEVELOPMENT-ONLY PLACEHOLDER, NOT LICENSED FOR REDISTRIBUTION",
+  "cleared": true,
+  "source": "Frédéric Chopin — Nocturne in F minor, Op. 55 No. 1, performed by Luke Faulkner (via Musopen). Recording from Wikimedia Commons: https://commons.wikimedia.org/wiki/File:Chopin_-_Nocturne-op-55-no-1.ogg — transcoded from the source .ogg to 192 kbps MP3, audio otherwise unaltered.",
+  "license": "CC0 1.0 Universal (Public Domain Dedication). The recording (the performance) is dedicated to the public domain; the composition is public domain (Chopin d. 1849). No rights reserved, no attribution required.",
   "attributionRequired": false,
   "attributionText": null
 }

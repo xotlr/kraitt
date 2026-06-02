@@ -5,6 +5,7 @@ import { FlagAT, FlagGB } from "@/components/console/flags";
 import { StudioButton } from "@/components/console/studio-button";
 import { useLanguage } from "@/lib/language-context";
 import { dict } from "@/lib/i18n";
+import { EASE } from "@/lib/motion";
 
 /**
  * LanguageToggle — the DE/EN switch as a console button showing the
@@ -35,7 +36,7 @@ export function LanguageToggle({ iconSize = 20 }: { iconSize?: number }) {
             initial={{ y: "-110%", opacity: 0 }}
             animate={{ y: "0%", opacity: 1 }}
             exit={{ y: "110%", opacity: 0 }}
-            transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.34, ease: EASE }}
             className="absolute inline-flex"
           >
             {lang === "de" ? (

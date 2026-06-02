@@ -42,5 +42,7 @@ next-env.d.ts
 /*.jpeg
 !/public/**/*.png
 
-# audio asset is unlicensed dev placeholder, see CLAUDE.md
-/public/audio/ambient.mp3
+# ambient.mp3 is now a CC0 / public-domain recording (Chopin Op. 55 No. 1,
+# perf. Luke Faulkner via Musopen) — license-cleared, so it ships with the
+# repo. Provenance: public/audio/LICENSE.json. (It was previously ignored as an
+# unlicensed dev placeholder; that no longer applies.)

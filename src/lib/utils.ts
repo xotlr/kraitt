@@ -25,20 +25,37 @@ export const INTENSITY_RAMP: readonly [number, number, number][] = [
 ];
 
 /**
- * Sample the intensity ramp at t (0..1) and return an `rgb(...)` string.
- * t is clamped; segments are linearly interpolated for a smooth gradient
- * with no hard zone cuts.
+ * Sample a ramp at t (0..1) and return the interpolated `[r, g, b]` tuple
+ * (un-rounded). t is clamped; segments are linearly interpolated for a
+ * smooth gradient with no hard zone cuts. This is the shared sampler the
+ * EQ and the fader both build on — `intensityColor` stringifies it; callers
+ * that need to blend the result further (e.g. toward a disabled tone) take
+ * the tuple.
  */
-export function intensityColor(
+export function sampleRamp(
   t: number,
   ramp: readonly [number, number, number][] = INTENSITY_RAMP
-): string {
+): [number, number, number] {
   const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
   const seg = clamped * (ramp.length - 1);
   const i = Math.min(ramp.length - 2, Math.floor(seg));
   const f = seg - i;
   const a = ramp[i];
   const b = ramp[i + 1];
-  const m = (j: number) => Math.round(a[j] + (b[j] - a[j]) * f);
-  return `rgb(${m(0)}, ${m(1)}, ${m(2)})`;
+  return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
+}
+
+/** An `[r, g, b]` tuple as an `rgb(...)` string (channels rounded). */
+export const rgbString = (c: readonly [number, number, number]): string =>
+  `rgb(${Math.round(c[0])}, ${Math.round(c[1])}, ${Math.round(c[2])})`;
+
+/**
+ * Sample the intensity ramp at t (0..1) and return an `rgb(...)` string.
+ * Convenience wrapper over `sampleRamp` for callers that just want a colour.
+ */
+export function intensityColor(
+  t: number,
+  ramp: readonly [number, number, number][] = INTENSITY_RAMP
+): string {
+  return rgbString(sampleRamp(t, ramp));
 }

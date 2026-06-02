@@ -2,6 +2,7 @@
 
 import { motion, type Variants } from "framer-motion";
 import { ChannelStrip } from "@/components/console/level-meter";
+import { EASE } from "@/lib/motion";
 
 /**
  * LeftRail — the LEFT console column, now the dedicated METERING INSTRUMENT:
@@ -13,7 +14,7 @@ import { ChannelStrip } from "@/components/console/level-meter";
  */
 const item: Variants = {
   hidden: { opacity: 0, x: -14 },
-  show: { opacity: 1, x: 0, transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.5 } },
+  show: { opacity: 1, x: 0, transition: { duration: 0.7, ease: EASE, delay: 0.5 } },
 };
 
 export function LeftRail() {
