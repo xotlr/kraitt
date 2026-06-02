@@ -149,12 +149,11 @@ const de: Dict = {
     p2a: "Nach meinem Abschluss am ",
     p2Em: "SAE Institute",
     p2b: " habe ich gelernt, technische Präzision und gestalterisches Gehör zusammenzubringen. Film und TV verlangen Tempo und Disziplin, Musik verlangt Geduld. Beides liegt mir.",
-    p3: "Ich arbeite für ORF-Produktionen, Spiel- und Kurzfilme, Dokumentationen und für Bands, die wissen, dass ein Song sich entscheidet, bevor er gemischt wird.",
+    p3: "Meine Arbeit reicht von Filmton und TV über Studio bis zur Musikproduktion — Setton und Postproduktion, Aufnahme und Mischung. Ein Song entscheidet sich, bevor er gemischt wird; daran arbeite ich.",
     facts: [
       { k: "Basis", v: "Wien, AT" },
       { k: "Ausbildung", v: "SAE Institute" },
-      { k: "Sprachen", v: "DE · EN · AR" },
-      { k: "Arbeitet seit", v: "2018" },
+      { k: "Sprachen", v: "DE · EN" },
     ],
   },
 
@@ -235,103 +234,37 @@ const de: Dict = {
           { label: "Format", value: "Kurzfilm" },
         ],
       },
-      "p-01": {
-        role: "Audiopostproduktion",
-        medium: "Magazinformat",
+      "p-stadt-ohne-heimat": {
+        role: "Tonaufnahme",
+        medium: "Stadt ohne Heimat – Von Königsberg nach Kaliningrad in 800 Jahren",
         description:
-          "Wöchentliche Audio-Post für einen ORF-Magazinbeitrag. Sprachbearbeitung, Atmo und Musikabmischung, EBU R128 konform. Schnelle Turnarounds, broadcast-ready innerhalb von Stunden.",
+          "Setton für eine TV-Dokumentation über die wechselvolle Geschichte Königsbergs / Kaliningrads.",
         credits: [
-          { label: "Sender", value: "ORF 2" },
-          { label: "Format", value: "Magazin" },
-          { label: "Beiträge", value: "12+" },
+          { label: "Rolle", value: "Sound Recordist" },
+          { label: "Format", value: "TV-Dokumentation" },
+          { label: "Jahr", value: "2025" },
         ],
       },
-      "p-02": {
-        role: "Setton",
-        medium: "Spielfilm, 92 Min.",
+      "p-zar-und-hitler": {
+        role: "Tonaufnahme",
+        medium: "Zwischen Zar und Hitler – Das Erbe der Weißen Armee",
         description:
-          "Drei Wochen Setton in Wien und Niederösterreich. Tonangel, Funkstrecken, Atmo. Enge Zusammenarbeit mit Regie und Schnitt für eine geräuschlich introspektive Bildsprache.",
+          "Setton für eine TV-Dokumentation über das Erbe der Weißen Armee zwischen Zarenreich und 20. Jahrhundert.",
         credits: [
-          { label: "Regie", value: "M. Holzer" },
-          { label: "Kamera", value: "L. Petković" },
-          { label: "Drehtage", value: "21" },
+          { label: "Rolle", value: "Sound Recordist" },
+          { label: "Format", value: "TV-Dokumentation" },
+          { label: "Jahr", value: "2025" },
         ],
       },
-      "p-03": {
-        role: "Mixing & Mastering",
-        medium: "Album, 11 Tracks",
+      "p-last-feminist": {
+        role: "Produktion & Rap-Coaching",
+        medium: "Bühnenproduktion, brut Wien",
         description:
-          "Hybrid-Mix mit analoger Summenbearbeitung. Vinyl- und Streaming-Master in getrennten Versionen. Fokus auf Dynamik statt Lautheit.",
+          "Produktion, technische Assistenz und Rap-Coaching für die Bühnenproduktion „The Last Feminist“ von Myassa Kraitt am brut Wien.",
         credits: [
-          { label: "Genre", value: "Indie / Post-Rock" },
-          { label: "Format", value: "Vinyl + Stream" },
-          { label: "Tracks", value: "11" },
-        ],
-      },
-      "p-04": {
-        role: "Setton & Tonassistenz",
-        medium: "Dokumentation, 45 Min.",
-        description:
-          "Nachtdrehs in Bergregion. Funkstrecken in feuchtem Umfeld, Atmo-Aufnahmen unter schwierigen Bedingungen. Tonassistenz für ein zweiköpfiges Team.",
-        credits: [
-          { label: "Sender", value: "ORF III / 3sat" },
-          { label: "Drehorte", value: "5" },
-          { label: "Drehtage", value: "14" },
-        ],
-      },
-      "p-05": {
-        role: "Komposition & Sounddesign",
-        medium: "Kurzfilm, 18 Min.",
-        description:
-          "Originalmusik und komplettes Sounddesign für einen experimentellen Kurzfilm. Modular-Synthesizer-Texturen, kombiniert mit Field Recordings.",
-        credits: [
-          { label: "Festivals", value: "3" },
-          { label: "Laufzeit", value: "18 Min." },
-          { label: "Tracks", value: "Original Score" },
-        ],
-      },
-      "p-06": {
-        role: "Recording Engineer",
-        medium: "Live Recording Series",
-        description:
-          "Mehrteilige Live-Aufnahme-Reihe in einem Wiener Kirchenraum. Ambisonic-Aufnahmen, kein Overdub. Rein dokumentarisch.",
-        credits: [
-          { label: "Sessions", value: "8" },
-          { label: "Künstler", value: "12" },
-          { label: "Setup", value: "Ambisonic" },
-        ],
-      },
-      "p-07": {
-        role: "Tonassistenz / Kamera-Ton",
-        medium: "Reportage",
-        description:
-          "Reportage-Einsätze als Kamera-Ton-Hybrid bei kleineren Crews. ENG-Workflow, schnelle Setups, broadcast-konforme Pegel direkt aus dem Feld.",
-        credits: [
-          { label: "Sender", value: "ORF" },
-          { label: "Format", value: "ENG" },
-          { label: "Einsätze", value: "20+" },
-        ],
-      },
-      "p-08": {
-        role: "Setton & Postproduktion",
-        medium: "Kurzfilm, 22 Min.",
-        description:
-          "Kompletter Audio-Workflow vom Setton bis zur fertigen Mischung. Stereo- und 5.1-Versionen. Festivalrundgang Europa.",
-        credits: [
-          { label: "Festivals", value: "Diagonale, Saarbrücken" },
-          { label: "Drehtage", value: "9" },
-          { label: "Format", value: "5.1 + Stereo" },
-        ],
-      },
-      "p-09": {
-        role: "Podcast Recording & Mix",
-        medium: "Podcast, 24 Episoden",
-        description:
-          "Mehrjährige Begleitung eines Wiener Kulturpodcasts. Aufnahme in unterschiedlichsten Räumen, ein einheitlicher Mix-Standard.",
-        credits: [
-          { label: "Episoden", value: "24" },
-          { label: "Gäste", value: "60+" },
-          { label: "Laufzeit", value: "ø 38 Min." },
+          { label: "Haus", value: "brut Wien" },
+          { label: "Rolle", value: "Produktion / Coaching" },
+          { label: "Jahr", value: "2024" },
         ],
       },
     },
@@ -395,12 +328,11 @@ const en: Dict = {
     p2a: "After finishing at ",
     p2Em: "SAE Institute",
     p2b: ", I learned to hold technical precision and a shaping ear in the same hand. Film and TV ask for speed and discipline, music asks for patience. Both suit me.",
-    p3: "I work on ORF productions, features and shorts, documentaries, and with bands who know a song is decided before it ever gets mixed.",
+    p3: "My work runs from film and TV sound through studio to music production — production sound and post, recording and mixing. A song is decided before it ever gets mixed; that's the part I work on.",
     facts: [
       { k: "Based", v: "Vienna, AT" },
       { k: "Training", v: "SAE Institute" },
-      { k: "Languages", v: "DE · EN · AR" },
-      { k: "Working since", v: "2018" },
+      { k: "Languages", v: "DE · EN" },
     ],
   },
 
@@ -481,103 +413,37 @@ const en: Dict = {
           { label: "Format", value: "Short film" },
         ],
       },
-      "p-01": {
-        role: "Audio Post",
-        medium: "Magazine format",
-        description:
-          "Weekly audio post for an ORF magazine segment. Dialogue editing, ambience, music balancing, EBU R128 compliant. Fast turnarounds, broadcast-ready within hours.",
-        credits: [
-          { label: "Channel", value: "ORF 2" },
-          { label: "Format", value: "Magazine" },
-          { label: "Segments", value: "12+" },
-        ],
-      },
-      "p-02": {
+      "p-stadt-ohne-heimat": {
         role: "Production Sound",
-        medium: "Feature, 92 min",
+        medium: "Stadt ohne Heimat – Von Königsberg nach Kaliningrad in 800 Jahren",
         description:
-          "Three weeks of production sound in Vienna and Lower Austria. Boom, wireless, ambience. Close work with the director and editor toward a sonically introspective feel.",
+          "Production sound for a TV documentary on the turbulent history of Königsberg / Kaliningrad.",
         credits: [
-          { label: "Director", value: "M. Holzer" },
-          { label: "Camera", value: "L. Petković" },
-          { label: "Shoot days", value: "21" },
+          { label: "Role", value: "Sound Recordist" },
+          { label: "Format", value: "TV documentary" },
+          { label: "Year", value: "2025" },
         ],
       },
-      "p-03": {
-        role: "Mixing & Mastering",
-        medium: "Album, 11 tracks",
+      "p-zar-und-hitler": {
+        role: "Production Sound",
+        medium: "Zwischen Zar und Hitler – Das Erbe der Weißen Armee",
         description:
-          "Hybrid mix with analogue bus processing. Separate vinyl and streaming masters. Focus on dynamics over loudness.",
+          "Production sound for a TV documentary on the legacy of the White Army between the Tsarist era and the 20th century.",
         credits: [
-          { label: "Genre", value: "Indie / Post-Rock" },
-          { label: "Format", value: "Vinyl + Stream" },
-          { label: "Tracks", value: "11" },
+          { label: "Role", value: "Sound Recordist" },
+          { label: "Format", value: "TV documentary" },
+          { label: "Year", value: "2025" },
         ],
       },
-      "p-04": {
-        role: "Production Sound & Assist",
-        medium: "Documentary, 45 min",
+      "p-last-feminist": {
+        role: "Production & Rap Coaching",
+        medium: "Stage production, brut Wien",
         description:
-          "Night shoots in the mountains. Wireless in a damp environment, ambience under difficult conditions. Sound assist for a two-person team.",
+          "Production, technical assistance and rap coaching for the stage production “The Last Feminist” by Myassa Kraitt at brut Wien.",
         credits: [
-          { label: "Channel", value: "ORF III / 3sat" },
-          { label: "Locations", value: "5" },
-          { label: "Shoot days", value: "14" },
-        ],
-      },
-      "p-05": {
-        role: "Composition & Sound Design",
-        medium: "Short film, 18 min",
-        description:
-          "Original music and full sound design for an experimental short. Modular synth textures layered with field recordings.",
-        credits: [
-          { label: "Festivals", value: "3" },
-          { label: "Runtime", value: "18 min" },
-          { label: "Tracks", value: "Original score" },
-        ],
-      },
-      "p-06": {
-        role: "Recording Engineer",
-        medium: "Live recording series",
-        description:
-          "A multi-part live recording series in a Viennese church. Ambisonic capture, no overdubs. Purely documentary.",
-        credits: [
-          { label: "Sessions", value: "8" },
-          { label: "Artists", value: "12" },
-          { label: "Setup", value: "Ambisonic" },
-        ],
-      },
-      "p-07": {
-        role: "Sound Assist / Camera Sound",
-        medium: "Reportage",
-        description:
-          "Reportage work as a camera-sound hybrid on small crews. ENG workflow, fast setups, broadcast-compliant levels straight from the field.",
-        credits: [
-          { label: "Channel", value: "ORF" },
-          { label: "Format", value: "ENG" },
-          { label: "Assignments", value: "20+" },
-        ],
-      },
-      "p-08": {
-        role: "Production Sound & Post",
-        medium: "Short film, 22 min",
-        description:
-          "Full audio workflow from production sound to final mix. Stereo and 5.1 versions. Festival run across Europe.",
-        credits: [
-          { label: "Festivals", value: "Diagonale, Saarbrücken" },
-          { label: "Shoot days", value: "9" },
-          { label: "Format", value: "5.1 + Stereo" },
-        ],
-      },
-      "p-09": {
-        role: "Podcast Recording & Mix",
-        medium: "Podcast, 24 episodes",
-        description:
-          "Several years alongside a Viennese culture podcast. Recorded across all kinds of rooms, held to one mix standard.",
-        credits: [
-          { label: "Episodes", value: "24" },
-          { label: "Guests", value: "60+" },
-          { label: "Runtime", value: "ø 38 min" },
+          { label: "Venue", value: "brut Wien" },
+          { label: "Role", value: "Production / Coaching" },
+          { label: "Year", value: "2024" },
         ],
       },
     },
