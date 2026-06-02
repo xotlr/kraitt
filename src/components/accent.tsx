@@ -46,6 +46,12 @@ export function Accent({ children }: { children: string }) {
     return () => io.disconnect();
   }, [ref, play]);
 
+  // Empty emphasis = no field. The bracket pseudo-elements (and the scramble)
+  // only earn their place around a real taggable noun; when a section folds its
+  // emphasis back into plain prose it passes "" here, and we render nothing
+  // rather than an empty "[ ]" readout. Hooks above always run (rules of hooks).
+  if (!children?.trim()) return null;
+
   return (
     <span
       ref={ref}

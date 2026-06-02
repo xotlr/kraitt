@@ -28,6 +28,11 @@ export interface Dict {
     mute: string;
     unmute: string;
     language: (active: string) => string;
+    /** Mobile transport: the track name shown in the scrubber pill, the
+     *  scrubber's a11y label, and the volume swipe a11y label. */
+    track: string;
+    transport: string;
+    volume: string;
   };
 
   meter: {
@@ -119,6 +124,9 @@ const de: Dict = {
     mute: "Stummschalten",
     unmute: "Ton einschalten",
     language: (active) => `Sprache: ${active}. Umschalten`,
+    track: "Chopin · Nocturne Op. 55/1",
+    transport: "Wiedergabe. Ziehen zum Spulen",
+    volume: "Lautstärke. Horizontal wischen",
   },
 
   meter: {
@@ -143,9 +151,9 @@ const de: Dict = {
     titleA: "Ein Ohr für den ",
     titleEm: "Raum zwischen",
     titleB: " den Tönen.",
-    p1a: "Mein Weg in den Ton begann mit einer Frage: warum manche Aufnahmen ",
-    p1Em: "da",
-    p1b: " sind und andere nicht. An dieser Antwort arbeite ich heute jeden Tag, zwischen Tonangel und Mischpult, zwischen Set und Studio.",
+    p1a: "Mein Weg in den Ton begann mit einer Frage: warum manche Aufnahmen da sind und andere nicht. An dieser Antwort arbeite ich heute jeden Tag, zwischen Tonangel und Mischpult, zwischen Set und Studio.",
+    p1Em: "",
+    p1b: "",
     p2a: "Nach meinem Abschluss am ",
     p2Em: "SAE Institute",
     p2b: " habe ich gelernt, technische Präzision und gestalterisches Gehör zusammenzubringen. Film und TV verlangen Tempo und Disziplin, Musik verlangt Geduld. Beides liegt mir.",
@@ -159,9 +167,9 @@ const de: Dict = {
 
   leistungen: {
     label: "Leistungen",
-    titleA: "Was ich ",
-    titleEm: "tue",
-    titleB: ", wenn ich arbeite.",
+    titleA: "Was ich tue, wenn ich arbeite.",
+    titleEm: "",
+    titleB: "",
     columns: [
       {
         heading: "Film & TV",
@@ -203,8 +211,8 @@ const de: Dict = {
 
   referenzen: {
     label: "Referenzen",
-    titleA: "Eine Auswahl ",
-    titleEm: "dessen, was bleibt.",
+    titleA: "Eine Auswahl dessen, was bleibt.",
+    titleEm: "",
     categories: [
       { id: "all", label: "Alle" },
       { id: "tv", label: "TV & Broadcast" },
@@ -298,6 +306,9 @@ const en: Dict = {
     mute: "Mute",
     unmute: "Unmute",
     language: (active) => `Language: ${active}. Switch`,
+    track: "Chopin · Nocturne Op. 55/1",
+    transport: "Playback. Drag to scrub",
+    volume: "Volume. Swipe horizontally",
   },
 
   meter: {
@@ -322,9 +333,9 @@ const en: Dict = {
     titleA: "An ear for the ",
     titleEm: "space between",
     titleB: " the notes.",
-    p1a: "I came to sound through one question: why some recordings are ",
-    p1Em: "there",
-    p1b: " and others are not. I work on that answer every day now, between the boom and the desk, between set and studio.",
+    p1a: "I came to sound through one question: why some recordings are there and others are not. I work on that answer every day now, between the boom and the desk, between set and studio.",
+    p1Em: "",
+    p1b: "",
     p2a: "After finishing at ",
     p2Em: "SAE Institute",
     p2b: ", I learned to hold technical precision and a shaping ear in the same hand. Film and TV ask for speed and discipline, music asks for patience. Both suit me.",
@@ -338,9 +349,9 @@ const en: Dict = {
 
   leistungen: {
     label: "Services",
-    titleA: "What I ",
-    titleEm: "do",
-    titleB: " when I work.",
+    titleA: "What I do, when I work.",
+    titleEm: "",
+    titleB: "",
     columns: [
       {
         heading: "Film & TV",
@@ -382,8 +393,8 @@ const en: Dict = {
 
   referenzen: {
     label: "Work",
-    titleA: "A selection of ",
-    titleEm: "what lasts.",
+    titleA: "A selection of what lasts.",
+    titleEm: "",
     categories: [
       { id: "all", label: "All" },
       { id: "tv", label: "TV & Broadcast" },

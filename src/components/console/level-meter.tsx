@@ -115,7 +115,7 @@ export function ChannelStrip() {
   return (
     <div
       ref={rootRef}
-      className="channel-strip relative flex h-full w-full flex-col gap-2 py-1"
+      className="channel-strip relative flex h-full w-full flex-col gap-3 py-2"
       style={
         {
           // Zone colours, pulled from the SCENE so the meter is on-theme: the

@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
 import { Island } from "@/components/island";
 import { GrainOverlay } from "@/components/grain-overlay";
-import { ConsolePanel } from "@/components/console/console-panel";
+import { MobileConsole } from "@/components/console/mobile-console";
+import { ConsoleHotkeys } from "@/components/console/console-hotkeys";
+import { PostFx } from "@/components/post-fx";
 import { KnobRail } from "@/components/console/knob-rail";
 import { LeftRail } from "@/components/console/left-rail";
 import { PageScroll } from "@/components/page-scroll";
@@ -28,10 +30,91 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
+// metadataBase resolves all relative URLs below (OG/icon paths, canonical) to
+// absolute ones — required for OpenGraph + for Google to trust the canonical.
+// The site's domain is sufiankraitt.com (see the contact email).
+const SITE_URL = "https://sufiankraitt.com";
+
 export const metadata: Metadata = {
-  title: "Sufian Kraitt · Audio Engineer / Filmton / Musikproduktion",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Sufian Kraitt · Audio Engineer / Filmton / Musikproduktion",
+    template: "%s · Sufian Kraitt",
+  },
   description:
-    "Audio Engineer für Film, TV und Musikproduktion. Setton, Audiopostproduktion, Mixing, Mastering, Sprachbearbeitung.",
+    "Audio Engineer für Film, TV und Musikproduktion. Setton, Audiopostproduktion, Mixing, Mastering, Sprachbearbeitung. Wien, AT.",
+  applicationName: "Sufian Kraitt",
+  authors: [{ name: "Sufian Kraitt" }],
+  creator: "Sufian Kraitt",
+  keywords: [
+    "Sufian Kraitt",
+    "Audio Engineer",
+    "Tonmeister",
+    "Filmton",
+    "Setton",
+    "Audiopostproduktion",
+    "Mixing",
+    "Mastering",
+    "Musikproduktion",
+    "Sound Recordist",
+    "Wien",
+  ],
+  // Canonical — tells Google the one true URL for this page (kills duplicate-
+  // content ambiguity from www/trailing-slash/query variants).
+  alternates: {
+    canonical: "/",
+  },
+  // The strongest honest "force Google" signal: explicitly allow full indexing
+  // AND opt into large image + snippet previews, so Google shows the rich
+  // result (favicon, title, description, OG image) rather than a bare link.
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  // Icons — point Google + browsers at the branded marks (App Router also
+  // auto-serves /icon.svg + /favicon.ico, but declaring them is explicit and
+  // adds the apple-touch icon for iOS home-screen).
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon-48.png", type: "image/png", sizes: "48x48" },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180" }],
+  },
+  manifest: "/manifest.webmanifest",
+  // OpenGraph — the card shown when the site is shared (Slack, iMessage,
+  // LinkedIn) and a ranking/relevance signal for search.
+  openGraph: {
+    type: "website",
+    siteName: "Sufian Kraitt",
+    title: "Sufian Kraitt · Audio Engineer / Filmton / Musikproduktion",
+    description:
+      "Audio Engineer für Film, TV und Musikproduktion. Setton, Audiopostproduktion, Mixing, Mastering.",
+    url: SITE_URL,
+    locale: "de_AT",
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "Sufian Kraitt — Audio Engineer",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Sufian Kraitt · Audio Engineer",
+    description: "Audio für Film, TV und Musikproduktion. Wien, AT.",
+    images: ["/og.png"],
+  },
 };
 
 export default function RootLayout({
@@ -50,6 +133,45 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `try{var t=localStorage.getItem('sk-theme');if(t==='light')document.documentElement.classList.add('light');var l=localStorage.getItem('sk-lang');if(l==='en')document.documentElement.lang='en'}catch(e){}`,
+          }}
+        />
+        {/* JSON-LD structured data — the strongest signal for Google to render a
+            branded/knowledge result for this person. Only verifiable facts; the
+            `sameAs` profiles (Instagram @szumksufko, IMDb nm17906294) are the
+            confirmed real ones — these are what let Google connect this site to
+            his off-site identity for a knowledge result. No LinkedIn (none
+            verified — a bogus sameAs is worse than none). */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Person",
+              name: "Sufian Kraitt",
+              jobTitle: "Audio Engineer",
+              description:
+                "Audio Engineer für Film, TV und Musikproduktion — Setton, Audiopostproduktion, Mixing, Mastering.",
+              url: "https://sufiankraitt.com",
+              email: "mailto:hello@sufiankraitt.com",
+              image: "https://sufiankraitt.com/og.png",
+              sameAs: [
+                "https://www.instagram.com/szumksufko/",
+                "https://www.imdb.com/name/nm17906294/",
+              ],
+              address: {
+                "@type": "PostalAddress",
+                addressLocality: "Wien",
+                addressCountry: "AT",
+              },
+              knowsAbout: [
+                "Production Sound",
+                "Audio Post-Production",
+                "Mixing",
+                "Mastering",
+                "Music Production",
+                "Sound Design",
+              ],
+            }),
           }}
         />
       </head>
@@ -123,8 +245,9 @@ export default function RootLayout({
                 top/bottom gutter on the island keeps the screen inset.
 
                 Below lg the rails collapse (bezel too thin for hardware)
-                and ConsolePanel takes over as a horizontal control deck
-                pinned below the content. */}
+                and MobileConsole takes over: two floating islands — a
+                Pro-Tools-style scrub transport pinned top, the controls +
+                swipeable volume pinned bottom. */}
             <div className="flex h-svh w-full items-stretch">
               <LeftRail />
               <Island>
@@ -133,17 +256,30 @@ export default function RootLayout({
               </Island>
               <KnobRail />
             </div>
-            <ConsolePanel />
+            <MobileConsole />
+            <ConsoleHotkeys />
           </ScrollProvider>
           </LanguageProvider>
           </AudioProvider>
         </ThemeProvider>
 
+        {/* Cinematic grade pass — light desaturation + filmic contrast +
+            vignette, reading the composited page. Sits at z-55, just UNDER the
+            grain, so the grain dusts the already-graded image. */}
+        <PostFx />
+
         {/* Page-wide film grain — one GPU layer over EVERYTHING (scene,
             console, type), rendered at full device resolution, screen-blended
             so the whole page reads as one filmic surface. Outside the providers
             since it needs no app state; last child so it composites on top. */}
-        <GrainOverlay amount={0.08} />
+        {/* Fine grain (1 physical px/cell) — razor-fine, NOT chunky; strength is
+            amount, not cell size. LAST child of <body> at z-60 so it composites
+            over EVERYTHING incl. the editorial type. blend="overlay" is the key to
+            "grain actually impacts the text": overlay pivots on mid-grey, so it
+            ADDS tooth on the dark scene AND carves grain INTO the cream glyphs —
+            unlike screen, which is near-identity on bright type. amount is lower
+            here than a screen layer because overlay bites much harder. */}
+        <GrainOverlay grainPx={1.0} amount={0.22} blend="overlay" />
       </body>
     </html>
   );

@@ -49,6 +49,21 @@ type AudioState = {
    *  shader watches LevelsRef.pulse (a counter) and launches a radial
    *  ring each time it increments. */
   triggerPulse: () => void;
+
+  // ── Transport (mobile Pro-Tools-style scrubber) ──────────────────────────
+  /** Elapsed playback time in seconds, updated on the music element's
+   *  timeupdate. 0 before the track has loaded/played. */
+  currentTime: number;
+  /** Track duration in seconds, 0 until metadata loads. */
+  duration: number;
+  /** Seek the music element to a 0..1 fraction of the track. No-op until the
+   *  element exists (i.e. after the first play). */
+  seek: (fraction: number) => void;
+  /** Static peak amplitudes (0..1) sampled across the whole track, for drawing
+   *  the transport waveform. Empty until the MP3 is decoded (lazy, on first
+   *  play). The bars are the same for every render — a fixed print of the file,
+   *  the way a DAW shows the clip's waveform. */
+  waveform: number[];
 };
 
 const VOLUME_STORAGE_KEY = "sk:volume";
@@ -130,6 +145,12 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const [musicStatus, setMusicStatus] = useState<MusicStatus>("idle");
   const [volume, setVolumeState] = useState<number>(DEFAULT_VOLUME);
   const [muted, setMuted] = useState(false);
+  // Transport state for the mobile scrubber. currentTime/duration mirror the
+  // music element; waveform is the decoded static peak print (computed once).
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [waveform, setWaveform] = useState<number[]>([]);
+  const waveformDecodedRef = useRef(false);
   const statusResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
@@ -216,6 +237,57 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     levelsRef.current.pulse += 1;
   }, []);
 
+  // Seek to a 0..1 fraction of the track. The transport scrubber calls this on
+  // drag/tap. No-op until the element exists (created on first play).
+  const seek = useCallback((fraction: number) => {
+    const el = audioElRef.current;
+    if (!el || !el.duration || !isFinite(el.duration)) return;
+    const f = Math.max(0, Math.min(1, fraction));
+    el.currentTime = f * el.duration;
+    setCurrentTime(el.currentTime);
+  }, []);
+
+  // Decode the MP3 ONCE into a static waveform peak-print (like a DAW clip).
+  // Lazy: fetched + decoded the first time music starts, so it costs nothing
+  // until the user engages audio. We downsample the decoded PCM into BAR_COUNT
+  // peak buckets (max-abs per bucket), normalised so the loudest bar is 1.0.
+  const decodeWaveform = useCallback(async (ctx: globalThis.AudioContext) => {
+    if (waveformDecodedRef.current) return;
+    waveformDecodedRef.current = true;
+    try {
+      const res = await fetch(MUSIC_SRC);
+      const buf = await res.arrayBuffer();
+      const audioBuf = await ctx.decodeAudioData(buf);
+      const ch = audioBuf.getChannelData(0); // mono is enough for a peak print
+      const BAR_COUNT = 96;
+      const block = Math.floor(ch.length / BAR_COUNT);
+      const bars: number[] = [];
+      let max = 0;
+      for (let i = 0; i < BAR_COUNT; i++) {
+        let peak = 0;
+        const start = i * block;
+        for (let j = 0; j < block; j++) {
+          const a = Math.abs(ch[start + j]);
+          if (a > peak) peak = a;
+        }
+        bars.push(peak);
+        if (peak > max) max = peak;
+      }
+      // Normalise to 0..1, then apply a gentle curve so quiet passages still
+      // show some bar height (a raw linear peak print on compressed music looks
+      // nearly flat). A floor keeps every bar visible as a tick.
+      const norm = bars.map((b) => {
+        const n = max > 0 ? b / max : 0;
+        return Math.max(0.08, Math.pow(n, 0.7));
+      });
+      setWaveform(norm);
+    } catch {
+      // Decode failure (CORS, unsupported) — leave waveform empty; the
+      // transport falls back to a flat baseline. Not fatal.
+      waveformDecodedRef.current = false;
+    }
+  }, []);
+
   // Lazily build the shared graph on first toggle. Browsers require a
   // user gesture before resume(), so we don't construct anything until
   // the user clicks one of the buttons.
@@ -254,7 +326,18 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       el.crossOrigin = "anonymous";
       el.preload = "auto";
       el.volume = mutedRef.current ? 0 : volumeRef.current;
+      // Transport wiring for the mobile scrubber: keep React's currentTime/
+      // duration in step with the element. timeupdate fires ~4×/s during play
+      // (cheap), loadedmetadata gives the duration once it's known.
+      el.addEventListener("loadedmetadata", () => {
+        if (isFinite(el.duration)) setDuration(el.duration);
+      });
+      el.addEventListener("timeupdate", () => {
+        setCurrentTime(el.currentTime);
+      });
       audioElRef.current = el;
+      // Decode the static waveform print once, lazily, now that audio is live.
+      void decodeWaveform(ctx);
       const src = ctx.createMediaElementSource(el);
       // Music graph: source -> destination (audible) and source -> analyser
       // (metering tap). The analyser is NOT chained to destination, so the
@@ -534,6 +617,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       toggleMusic,
       toggleMic,
       triggerPulse,
+      currentTime,
+      duration,
+      seek,
+      waveform,
     }),
     [
       musicOn,
@@ -546,6 +633,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       toggleMusic,
       toggleMic,
       triggerPulse,
+      currentTime,
+      duration,
+      seek,
+      waveform,
     ]
   );
   const levelsValue = useMemo(() => ({ current: levelsRef.current }), []);

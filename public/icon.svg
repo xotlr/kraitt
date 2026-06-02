@@ -1,0 +1,17 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sufian Kraitt">
+  <!-- Brand tile: rounded near-black square, the studio-monitor screen. -->
+  <rect width="32" height="32" rx="7" fill="#070808"/>
+  <!-- Hairline screen edge so the tile reads as a framed screen, not a flat chip. -->
+  <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" stroke="#ffffff" stroke-opacity="0.08"/>
+  <!-- Waveform: FOUR thick, well-spaced bars (a level/peak print) so it stays
+       legible down to 16px, where five thin bars muddied together. Cool-grey
+       outers, the centre pair carrying the print, ONE amber peak (the desk's
+       single accent). Rounded caps = soft level segments, centred on y=16. -->
+  <g stroke-linecap="round" stroke-width="4">
+    <line x1="8"  y1="20.5" x2="8"  y2="11.5" stroke="#9aa0a6"/>
+    <!-- amber peak — tallest, left-of-centre so the accent isn't dead-centre -->
+    <line x1="14" y1="24.5" x2="14" y2="7.5"  stroke="#c2a578"/>
+    <line x1="20" y1="22.5" x2="20" y2="9.5"  stroke="#c8ccd1"/>
+    <line x1="26" y1="19.5" x2="26" y2="12.5" stroke="#9aa0a6"/>
+  </g>
+</svg>

@@ -55,6 +55,7 @@ export function StudioButton({
   onClick,
   ariaLabel,
   ariaCurrent,
+  shortcut,
   children,
 }: {
   label?: React.ReactNode;
@@ -81,6 +82,10 @@ export function StudioButton({
   onClick?: React.MouseEventHandler<HTMLButtonElement>;
   ariaLabel?: string;
   ariaCurrent?: boolean;
+  /** Keyboard-shortcut hint shown as a small shadcn-style <kbd> chip beneath
+   *  the cap (e.g. "⌘P", "1"). Decorative label only — the actual key handler
+   *  lives in useConsoleHotkeys; this just shows the user which key fires it. */
+  shortcut?: string;
   children?: React.ReactNode;
 }) {
   const dim = size != null ? `${size}px` : "var(--console-unit)";
@@ -247,6 +252,18 @@ export function StudioButton({
         </span>
       </motion.span>
       {label != null && <RailLabel active={active}>{label}</RailLabel>}
+      {shortcut && (
+        // shadcn-style kbd chip: a small engraved key sitting beneath the cap,
+        // in the silkscreen-print ink so it reads as a panel legend, not content.
+        // aria-hidden — the action's real a11y name is on the button; this is a
+        // visual hint, and the key handler lives in useConsoleHotkeys.
+        <kbd
+          aria-hidden
+          className="console-kbd pointer-events-none mt-0.5 leading-none"
+        >
+          {shortcut}
+        </kbd>
+      )}
     </button>
   );
 }

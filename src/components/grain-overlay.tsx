@@ -22,10 +22,13 @@ import { useEffect, useRef } from "react";
  * nothing per frame. (Static grain also sidesteps the temporal flicker that
  * fine animated grain always suffers.)
  *
- * Blend: the canvas element is set to `mix-blend-mode: soft-light`. The
- * shader outputs grain as small deviations around mid-grey 0.5; under
- * soft-light a flat 0.5 is a no-op, so untouched pixels pass through and only
- * the grain's light/dark deviations dust the page.
+ * Blend: the canvas element is `mix-blend-mode: screen` and the shader emits
+ * ADDITIVE premultiplied grain (positive-only luminance on a transparent
+ * canvas — see the FRAG comment). soft-light is near-identity on dark pixels,
+ * so it looked weak over the dark island; screen over black is a pure add, so
+ * the grain reads as crisp bright specks on the near-black bed and compresses
+ * gently over bright type/gutter so it never blows the text out. `amount` is
+ * the speck brightness — it can ride fairly high before it touches the type.
  */
 
 const VERT = `#version 300 es
@@ -42,6 +45,7 @@ out vec4 outColor;
 
 uniform float u_grainPx;   // device px per grain cell
 uniform float u_amount;    // grain amplitude
+uniform float u_overlay;   // 1.0 = mid-grey-centred output for CSS overlay blend
 
 // Dave Hoskins hash13 (https://www.shadertoy.com/view/4djSRW): vec3 -> [0,1).
 float hash13(vec3 p3) {
@@ -71,21 +75,30 @@ void main() {
   // pixel — the grain is as fine as the display allows. u_grainPx gives each
   // grain a hair of spatial extent so it isn't sub-pixel fragile.
   vec2 cell = floor(gl_FragCoord.xy / u_grainPx);
-  float g = gaussian(hash13(vec3(cell, 0.0)));   // fixed field, static
+  float g = gaussian(hash13(vec3(cell, 0.0)));   // fixed field, static, two-sided
 
-  // ADDITIVE on black. The old in-scene grain looked best because it ADDED
-  // light onto the near-black bed (col += grain), so the grain read as crisp
-  // bright specks on black. soft-light is near-identity on dark pixels, which
-  // is why the overlay looked weak over the dark island. So we emit grain as
-  // positive-only luminance on a TRANSPARENT canvas and blend with screen
-  // (mix-blend-screen on the element): screen over black = pure add (crisp
-  // grain on the island), and over bright text/gutter it compresses gently so
-  // it never blows the type out. abs() turns the Gaussian's two-sided
-  // deviation into light grains (grain on black can only lighten; there is
-  // nothing darker than black to go to).
+  if (u_overlay > 0.5) {
+    // OVERLAY path — for the page-wide layer that must bite the TEXT too.
+    // CSS overlay-blend pivots on mid-grey 0.5: output < 0.5 darkens the
+    // backdrop, > 0.5 lightens it, and exactly 0.5 is a no-op. So we emit the
+    // Gaussian TWO-SIDED deviation centred on 0.5 (not abs), at full alpha. On the
+    // near-black scene this lightens (adds tooth, like screen did); over the
+    // cream type it both lightens AND darkens grain INTO the glyphs — which is
+    // the "grain actually impacts the text" the brief asks for. NOT premultiplied
+    // (straight alpha), so the CSS overlay math sees the real 0.5±g value.
+    float v = clamp(0.5 + g * u_amount, 0.0, 1.0);
+    outColor = vec4(vec3(v), 1.0);
+    return;
+  }
+
+  // SCREEN path (default) — ADDITIVE on black. The old in-scene grain looked
+  // best because it ADDED light onto the near-black bed (col += grain), so the
+  // grain read as crisp bright specks on black. So we emit grain as positive-
+  // only luminance on a TRANSPARENT canvas and blend with screen: screen over
+  // black = pure add (crisp grain on the island), and over bright text it
+  // compresses gently. abs() turns the two-sided Gaussian into light grains.
   float lum = abs(g) * u_amount;
-  // Premultiplied: rgb already multiplied by alpha. With screen blend the
-  // backdrop sees lum added on black.
+  // Premultiplied: rgb already multiplied by alpha.
   outColor = vec4(vec3(lum), lum);
 }`;
 
@@ -106,6 +119,7 @@ export function GrainOverlay({
   grainPx = 1.0,
   amount = 0.18,
   position = "fixed",
+  blend = "screen",
 }: {
   /** Device px per grain cell. 1.0 = finest (1 physical px). */
   grainPx?: number;
@@ -117,6 +131,13 @@ export function GrainOverlay({
   /** "fixed" = full-page layer (default). "absolute" = fills a positioned
    *  parent, e.g. a second grain pass scoped to the content island. */
   position?: "fixed" | "absolute";
+  /** Compositing blend.
+   *  - "screen" (default): pure ADD on black — crispest grain on the dark
+   *    scene bed, near-identity on bright type (so it does NOT bite the text).
+   *  - "overlay": modulates around mid-grey — ADDS on the dark bed AND
+   *    SUBTRACTS on bright glyphs, so the grain actually carves into the cream
+   *    editorial type. Use this for the page-wide layer that sits over text. */
+  blend?: "screen" | "overlay";
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -124,13 +145,16 @@ export function GrainOverlay({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    const isOverlay = blend === "overlay";
     const gl = canvas.getContext("webgl2", {
       alpha: true,
       antialias: false,
       depth: false,
       stencil: false,
-      // Shader emits premultiplied alpha (rgb already * a) for the screen blend.
-      premultipliedAlpha: true,
+      // Screen path emits premultiplied additive luminance; overlay path emits a
+      // straight (non-premultiplied) mid-grey-centred value the CSS overlay blend
+      // reads directly. The context's premultiply flag must match the shader.
+      premultipliedAlpha: !isOverlay,
       preserveDrawingBuffer: false,
     });
     if (!gl) return; // No WebGL2 → simply no grain. Page is fine without it.
@@ -162,7 +186,9 @@ export function GrainOverlay({
 
     const uGrainPx = gl.getUniformLocation(prog, "u_grainPx");
     const uAmount = gl.getUniformLocation(prog, "u_amount");
+    const uOverlay = gl.getUniformLocation(prog, "u_overlay");
     gl.uniform1f(uAmount, amount);
+    gl.uniform1f(uOverlay, isOverlay ? 1 : 0);
 
     // Render at TRUE device resolution (no DPR cap) so the grain is physical-
     // pixel fine. Cap at the real ratio; clamp to a sane ceiling so a 5x phone
@@ -205,15 +231,16 @@ export function GrainOverlay({
       const ext = gl.getExtension("WEBGL_lose_context");
       ext?.loseContext();
     };
-  }, [grainPx, amount]);
+  }, [grainPx, amount, blend]);
 
   return (
     <canvas
       ref={canvasRef}
       aria-hidden
+      style={{ mixBlendMode: blend }}
       className={`pointer-events-none ${
         position === "fixed" ? "fixed z-[60]" : "absolute z-[6]"
-      } inset-0 h-full w-full mix-blend-screen`}
+      } inset-0 h-full w-full`}
     />
   );
 }

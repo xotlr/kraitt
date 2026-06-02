@@ -12,14 +12,27 @@ import { EASE } from "@/lib/motion";
  * (the moneypower / screenwriter sun-moon pattern). The icon is the
  * active amber so it reads as a lit control regardless of mode.
  */
-export function ThemeToggle({ iconSize = 20 }: { iconSize?: number }) {
+export function ThemeToggle({
+  iconSize = 20,
+  shortcut,
+  quiet = false,
+}: {
+  iconSize?: number;
+  shortcut?: string;
+  /** Rest in quiet ink instead of the permanent amber indicator. Used on the
+   *  cramped mobile control bar, where a always-amber icon made the bar busy —
+   *  there the icon stays muted and only the desk's one accent (the amber
+   *  audio peaks) carries colour. Desktop keeps the lit indicator (quiet=false). */
+  quiet?: boolean;
+}) {
   const { theme, toggle } = useTheme();
   const dark = theme === "dark";
 
   return (
     <StudioButton
-      active
+      active={!quiet}
       latch={false}
+      shortcut={shortcut}
       onClick={toggle}
       ariaLabel={dark ? "Helles Design einschalten" : "Dunkles Design einschalten"}
     >

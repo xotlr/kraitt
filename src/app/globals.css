@@ -21,12 +21,16 @@
      own backdrop stays --color-canvas (near-black) for its hard edge. */
   --color-bezel: #090909;
 
-  /* Type sits slightly cool of cream — pale, not amber. Brightened a step
-     (was #ece8df / #8a857c / #4a4640) so the foreground reads cleaner and
-     more legible against the OLED-black bed without going pure white. */
-  --color-ink: #f5f2eb;
-  --color-ink-muted: #9d988e;
-  --color-ink-faint: #565249;
+  /* Type is COOL LIGHT GREY, not cream — shifted off warm white toward the
+     console/icon palette (--console-print #74757a, the cool silver icon ramp)
+     so the editorial type belongs to the same instrument register as the chrome
+     AND so the film grain reads THROUGH the glyphs (a pure-white glyph swallows
+     overlay grain; a cool grey lets the texture show). Still light enough to
+     stay high-contrast + legible for body. Was warm cream #f5f2eb / #9d988e /
+     #565249; now desaturated and biased cool. */
+  --color-ink: #d4d6d9;
+  --color-ink-muted: #8e9096;
+  --color-ink-faint: #565a60;
 
   /* Hairlines bias cool and a notch brighter than before so they're
      visible against pure black (the old #1a1c1f was tuned for the
@@ -129,8 +133,13 @@
      edge; the rail width and meter width derive from it, so changing this
      single value rescales both side rails, every button, and the volume
      meter in lockstep. */
-  --console-unit: 40px;
-  --console-rail-pad: 14px; /* breathing room each side of a cap in the rail */
+  --console-unit: 44px; /* button cap edge — bumped from 40 for a larger grouping */
+  --console-rail-pad: 18px; /* wider breathing room each side of a cap in the rail */
+  /* Navpill grouping: the pad between a cap and the pill shell, and the pill's
+     own corner radius. Bumped from the old 6px/13px fallbacks so the pills frame
+     the (now larger) caps with more room. The cap radius derives from these. */
+  --console-group-pad: 8px;
+  --console-group-radius: 16px;
   --console-rail-w: calc(var(--console-unit) + var(--console-rail-pad) * 2);
   /* The channel strip holds the EQ (with the volume handle riding across it)
      and the VU dial above. Sized so its navpill ends up the SAME width as the
@@ -195,17 +204,17 @@ html.light {
 @property --color-ink {
   syntax: "<color>";
   inherits: true;
-  initial-value: #f5f2eb;
+  initial-value: #d4d6d9;
 }
 @property --color-ink-muted {
   syntax: "<color>";
   inherits: true;
-  initial-value: #9d988e;
+  initial-value: #8e9096;
 }
 @property --color-ink-faint {
   syntax: "<color>";
   inherits: true;
-  initial-value: #565249;
+  initial-value: #565a60;
 }
 @property --color-hairline {
   syntax: "<color>";
@@ -405,29 +414,35 @@ html.light {
      large fraction of the stroke and just looks broken (see the caution in the
      .text-accent block — small mono stays clean). */
   .wordmark-fringe {
-    --fringe: calc(var(--audio-glow, 0) * 0.7px);
+    /* SIGNATURE MOMENT: the wordmark wakes up with the music. At silence
+       (--audio-glow 0) it's perfectly crisp single-ink; as the beat drives glow
+       toward 1 the letters SPLIT into a red/cyan analog-signal fringe and bloom a
+       cold halo — the headline visibly "comes alive" on play. Amplified from the
+       old 0.7px/0.5-alpha rig so it READS as a moment, not a whisper, while
+       staying a phase artifact (split capped ~1.5px at display size, not a focus
+       error) and fully 0 at rest. */
+    --fringe: calc(var(--audio-glow, 0) * 1.5px);
     /* Two layered systems sharing one signal:
-       1. The R/C chromatic split (warm-red left, cyan right) — sub-pixel,
-          0 at silence, the analog-signal signature described above.
-       2. A soft luminous bloom in the string colour — a FAINT always-on halo
-          (the 4px/0.18 base, present at rest) that SWELLS with --audio-glow
-          (radius 4px→~24px, alpha 0.18→~0.55). This is the glow the reference
-          .heroT h2 carried: a cold halo bleeding off the letters. Kept in the
-          string colour so the wordmark stays on the shader's cold palette and
-          never reads amber (amber is reserved for the audio accents). */
+       1. The R/C chromatic split (warm-red left, cyan right) — 0 at silence,
+          up to ~1.5px on a peak; alpha climbs to ~0.8 so the split is clearly
+          visible on the beat, the analog-signal signature.
+       2. A soft luminous bloom in the string colour: a FAINT always-on halo
+          (4px/0.16 base) that SWELLS hard with --audio-glow (radius 4px→~40px,
+          alpha 0.16→~0.7). Kept in the string colour so the wordmark stays on
+          the shader's cold palette and never reads amber. */
     text-shadow:
       calc(var(--fringe) * -1) 0 0
-        rgba(255, 70, 70, calc(var(--audio-glow, 0) * 0.5)),
+        rgba(255, 64, 64, calc(var(--audio-glow, 0) * 0.8)),
       var(--fringe) 0 0
-        rgba(70, 210, 255, calc(var(--audio-glow, 0) * 0.5)),
-      0 0 calc(4px + var(--audio-glow, 0) * 20px)
+        rgba(64, 208, 255, calc(var(--audio-glow, 0) * 0.8)),
+      0 0 calc(4px + var(--audio-glow, 0) * 36px)
         color-mix(
           in srgb,
           var(--color-string)
-            calc((0.18 + var(--audio-glow, 0) * 0.37) * 100%),
+            calc((0.16 + var(--audio-glow, 0) * 0.54) * 100%),
           transparent
         );
-    transition: text-shadow 90ms linear;
+    transition: text-shadow 70ms linear;
   }
   .font-mono {
     font-family: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
@@ -495,6 +510,99 @@ html.light {
     line-height: 1.4;
     letter-spacing: 0.18em;
     text-transform: uppercase;
+  }
+
+  /* ── Liquid-glass screen edge ─────────────────────────────────────────
+     The content island reads as a sheet of GLASS laid over the monitor. Apple's
+     "liquid glass" cue is specular LIGHT on a curved lip + a sense of thickness,
+     never a frosted wash. Built as light-only layers, then MASKED to a thin
+     perimeter band so the centre of the screen is perfectly clear (the body
+     copy is never veiled).
+
+     Layers (top to bottom in the stack):
+       1. ::before — the bright SPECULAR rim raking the top-left curved edge
+          (a conic-ish bright arc), plus a fainter cool sheen along the top.
+       2. the element's own box-shadow — an inset glass bevel: a bright inner
+          top-left highlight and a soft bottom-right inner shadow, so the glass
+          reads as a few mm thick with a lit lip.
+     The mask is a radial alpha that's transparent in the middle and opaque only
+     near the rounded border, turning the whole thing into an EDGE treatment. */
+  .liquid-glass-edge {
+    /* Glass thickness: a lit inner lip top-left, shaded inner lip bottom-right. */
+    box-shadow:
+      inset 1.5px 1.5px 1px color-mix(in srgb, white 22%, transparent),
+      inset -1.5px -1.5px 2px color-mix(in srgb, black 30%, transparent),
+      inset 0 0 1px color-mix(in srgb, white 16%, transparent);
+  }
+  .liquid-glass-edge::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    /* Specular highlights: a bright top-left corner bloom (the key light hitting
+       the curved glass lip) + a thin cool sheen running along the top edge. Both
+       are pure light on transparent. */
+    background:
+      radial-gradient(
+        70% 55% at 14% 8%,
+        color-mix(in srgb, white 26%, transparent) 0%,
+        transparent 42%
+      ),
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--color-string) 14%, transparent) 0%,
+        transparent 14%
+      );
+    /* Mask to the PERIMETER: clear in the centre, opaque only near the edge, so
+       the speculars live on the rim and the screen middle stays untouched. */
+    -webkit-mask: radial-gradient(
+      130% 130% at 50% 50%,
+      transparent 60%,
+      black 88%
+    );
+    mask: radial-gradient(130% 130% at 50% 50%, transparent 60%, black 88%);
+  }
+  /* Light mode: the glass lip reads with softer speculars on the pale screen so
+     it doesn't blow out against parchment. */
+  html.light .liquid-glass-edge {
+    box-shadow:
+      inset 1.5px 1.5px 1px color-mix(in srgb, white 60%, transparent),
+      inset -1.5px -1.5px 2px color-mix(in srgb, black 12%, transparent),
+      inset 0 0 1px color-mix(in srgb, white 40%, transparent);
+  }
+
+  /* Console keyboard-shortcut chip — the shadcn <kbd> look in the console's
+     machined-key language. A tiny engraved key cap: a faint raised graphite
+     plate, silkscreen-print legend, sitting beneath a StudioButton. Sized off
+     the mono register so it stays a hint, never competes with the cap. */
+  .console-kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 15px;
+    height: 14px;
+    padding: 0 4px;
+    border-radius: 4px;
+    font-family: var(--font-mono), monospace;
+    font-size: 9px;
+    font-weight: var(--weight-mono);
+    letter-spacing: 0.04em;
+    color: var(--console-print);
+    background: linear-gradient(
+      180deg,
+      var(--console-cap-hi) 0%,
+      var(--console-cap) 100%
+    );
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, white 12%, transparent),
+      0 1px 1px color-mix(in srgb, black 45%, transparent),
+      0 0 0 1px var(--console-edge);
+  }
+  html.light .console-kbd {
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, white 50%, transparent),
+      0 1px 1px color-mix(in srgb, black 12%, transparent),
+      0 0 0 1px color-mix(in srgb, black 14%, transparent);
   }
 }
 
@@ -616,6 +724,43 @@ html.light {
     --pill-shadow-1: 14%;
     --pill-shadow-2: 9%;
     --pill-border: 11%;
+  }
+
+  /* RAISED faceplate variant — the metering instrument (left strip) reads as a
+     machined module that sits PROUD of the panel, the same way the StudioButton
+     caps do, instead of a recessed trough. The VU + EQ windows INSIDE it stay
+     recessed (.console-recess-window): recessed glass set into a raised plate,
+     which is how a real channel strip is built. Mirrors the StudioButton idle
+     cap exactly — raked top-left key light (115deg), lit top-left bevel, shade
+     pooling bottom-right, a hard edge ring, and cast shadows falling down-right
+     so the whole module floats off the field. Overrides the base .console-group
+     trough (the fill gradient + the inset well box-shadow). */
+  .console-group--raised {
+    background: linear-gradient(
+      115deg,
+      var(--console-cap-hi) 0%,
+      var(--console-cap) 46%,
+      color-mix(in srgb, var(--console-cap) 82%, black) 100%
+    );
+    box-shadow:
+      inset 1px 1px 0 color-mix(in srgb, white 16%, transparent),
+      inset -1px -1px 1px color-mix(in srgb, black 48%, transparent),
+      0 0 0 1px var(--console-edge),
+      1px 1px 0 color-mix(in srgb, white 4%, transparent),
+      1px 2px 4px color-mix(in srgb, black 40%, transparent),
+      2px 5px 12px color-mix(in srgb, black 38%, transparent);
+  }
+  /* Light mode: the same raised plate reads on parchment with a softer lit
+     bevel and lighter cast shadows (the dark-tuned blacks are too heavy on the
+     pale desk). Cap tokens already theme-shift, so only the white highlight +
+     shadow alphas need easing. */
+  html.light .console-group--raised {
+    box-shadow:
+      inset 1px 1px 0 color-mix(in srgb, white 55%, transparent),
+      inset -1px -1px 1px color-mix(in srgb, black 14%, transparent),
+      0 0 0 1px color-mix(in srgb, black 18%, transparent),
+      1px 2px 4px color-mix(in srgb, black 12%, transparent),
+      2px 5px 12px color-mix(in srgb, black 10%, transparent);
   }
 
   /* ── Recessed meter window (VU dial + EQ bars) ────────────────────────

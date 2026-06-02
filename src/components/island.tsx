@@ -59,9 +59,21 @@ export function Island({ children }: { children: React.ReactNode }) {
               where the user wanted more texture, without piling grain onto the
               editorial type. Stacks additively (screen blend) on top of the
               page-wide layer. */}
-          <GrainOverlay position="absolute" amount={0.16} />
+          <GrainOverlay position="absolute" grainPx={1.0} amount={0.16} />
           {/* children render <Scene/> (z-0) then the scroll content (z-10). */}
           {children}
+
+          {/* LIQUID-GLASS edge — a thick glass cover over the monitor screen.
+              Sits ABOVE the content (z-20) but pointer-events-none. The look is
+              built from stacked, non-competing light layers (specular top-left
+              rim, inner bevel thickness, top sheen), all MASKED to a thin band
+              around the perimeter so it's an EDGE effect and never veils the
+              editorial body. See .liquid-glass-edge in globals.css. */}
+          <div
+            aria-hidden
+            className="liquid-glass-edge pointer-events-none absolute inset-0 z-20 rounded-[1.25rem]"
+          />
+
           {/* Numeric measurement rulers framing the screen. Both carry the
               same fixed 00–100 scale and track live scroll %, so they read as
               ONE instrument: the RIGHT is the draggable scrubber (the value

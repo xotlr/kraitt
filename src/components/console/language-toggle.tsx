@@ -16,18 +16,35 @@ import { EASE } from "@/lib/motion";
  * they appear to roll through a slot. The flag carries its own colours, so
  * the button stays a neutral black cap.
  */
-export function LanguageToggle({ iconSize = 20 }: { iconSize?: number }) {
+export function LanguageToggle({
+  iconSize = 20,
+  shortcut,
+  quiet = false,
+}: {
+  iconSize?: number;
+  shortcut?: string;
+  /** Desaturate the flag at rest so it reads as a quiet engraved chip, not a
+   *  full-colour sticker. Used on the mobile control bar to calm its colour;
+   *  full colour returns on hover/focus. Desktop keeps the full flag. */
+  quiet?: boolean;
+}) {
   const { lang, toggle } = useLanguage();
 
   return (
     <StudioButton
+      shortcut={shortcut}
       onClick={toggle}
       ariaLabel={dict(lang).console.language(lang.toUpperCase())}
     >
       {/* Clip slot: flags roll through this; overflow-hidden + sized to the
           flag so the entering/exiting flag is masked above and below. */}
       <span
-        className="relative inline-flex items-center justify-center overflow-hidden"
+        className={
+          "relative inline-flex items-center justify-center overflow-hidden transition-[filter] duration-300" +
+          (quiet
+            ? " [filter:saturate(0.32)_brightness(0.9)] group-hover:[filter:saturate(1)_brightness(1)]"
+            : "")
+        }
         style={{ width: iconSize, height: iconSize }}
       >
         <AnimatePresence mode="popLayout" initial={false}>

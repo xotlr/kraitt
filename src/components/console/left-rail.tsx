@@ -29,10 +29,15 @@ export function LeftRail() {
         paddingBottom: "var(--console-rail-inset)",
       }}
     >
+      {/* Raised faceplate: the whole metering module sits PROUD of the panel
+          like the StudioButton caps (console-group--raised), the recessed VU/EQ
+          windows set into it. A hair more pad than a button group so the raised
+          plate shows a frame of machined surface around the sunk glass. */}
       <motion.div
         variants={item}
-        className="console-group min-h-0 flex-1 flex-col"
+        className="console-group console-group--raised min-h-0 flex-1 flex-col"
         style={{
+          ["--console-group-pad" as string]: "7px",
           width:
             "calc(var(--console-strip-w) + var(--console-group-pad, 6px) * 2)",
         }}

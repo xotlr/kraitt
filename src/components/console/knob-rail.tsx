@@ -29,7 +29,7 @@ import { EASE } from "@/lib/motion";
  * Section presses fire a manual wave pulse when no audio source is playing,
  * so the desk visibly drives the signal even in silence.
  *
- * lg+ only; below lg the bottom ConsolePanel takes over.
+ * lg+ only; below lg the MobileConsole (two floating islands) takes over.
  */
 const rail: Variants = {
   hidden: {},
@@ -70,7 +70,7 @@ export function KnobRail() {
             dark chip with pale letters — maximum pop, and it flips with the
             theme for free since both are tokens. Sits in the same recessed
             pill as the clusters; links home. */}
-        <motion.div variants={item} className="console-group">
+        <motion.div variants={item} className="console-group console-group--raised">
           <a
             href="#hero"
             onClick={scrollTo("hero")}
@@ -90,12 +90,13 @@ export function KnobRail() {
           variants={item}
           role="group"
           aria-label="Audioquellen"
-          className="console-group flex flex-col items-center gap-1.5"
+          className="console-group console-group--raised flex flex-col items-center gap-1.5"
         >
           <StudioButton
             active={musicOn}
             tone="play"
             dot
+            shortcut="⌘P"
             disabled={musicStatus === "unavailable"}
             onClick={() => void toggleMusic()}
             ariaLabel={
@@ -112,6 +113,7 @@ export function KnobRail() {
             active={micOn}
             tone="rec"
             dot
+            shortcut="⌘M"
             onClick={() => void toggleMic()}
             ariaLabel={c.mic}
           >
@@ -122,6 +124,7 @@ export function KnobRail() {
             active={muted}
             tone="rec"
             dot
+            shortcut="⌘S"
             onClick={toggleMute}
             ariaLabel={muted ? c.unmute : c.mute}
           >
@@ -136,8 +139,8 @@ export function KnobRail() {
 
       {/* MIDDLE — section navigation, centred between the transport above and
           the settings below (justify-between spaces the three zones out). */}
-      <nav aria-label="Sektionen" className="console-group flex flex-col items-center gap-1.5">
-        {SECTIONS.map((s) => {
+      <nav aria-label="Sektionen" className="console-group console-group--raised flex flex-col items-center gap-1.5">
+        {SECTIONS.map((s, i) => {
           const Icon = s.icon;
           const isActive = active === s.id;
           return (
@@ -145,6 +148,7 @@ export function KnobRail() {
               <StudioButton
                 active={isActive}
                 dot
+                shortcut={String(i + 1)}
                 onClick={handleSection(s.id)}
                 ariaLabel={nav[s.id as keyof Dict["nav"]] ?? s.label}
                 ariaCurrent={isActive}
@@ -161,10 +165,10 @@ export function KnobRail() {
         variants={item}
         role="group"
         aria-label="Einstellungen"
-        className="console-group flex flex-col items-center gap-1.5"
+        className="console-group console-group--raised flex flex-col items-center gap-1.5"
       >
-        <ThemeToggle iconSize={18} />
-        <LanguageToggle iconSize={18} />
+        <ThemeToggle iconSize={18} shortcut="⌘T" />
+        <LanguageToggle iconSize={18} shortcut="⌘L" />
       </motion.div>
     </motion.div>
   );

@@ -21,10 +21,12 @@ const emailReveal = mkFadeUp(14, 1.1);
 
 const email = "hello@sufiankraitt.com";
 
+// Real, verified profiles only (no LinkedIn — none confirmed). Instagram
+// @szumksufko is Sufian's handle / SzumK artist alias; IMDb nm17906294 is his
+// verified credits page (also used on the project rows).
 const links: { label: string; href: string }[] = [
-  { label: "Instagram", href: "https://instagram.com" },
-  { label: "LinkedIn", href: "https://linkedin.com" },
-  { label: "IMDb", href: "https://imdb.com" },
+  { label: "Instagram", href: "https://www.instagram.com/szumksufko/" },
+  { label: "IMDb", href: "https://www.imdb.com/name/nm17906294/" },
 ];
 
 export function Kontakt() {
@@ -54,9 +56,18 @@ export function Kontakt() {
           {...reveal}
           className="group block py-12 md:py-20"
         >
+          {/* The email is one unbreakable 22-char token, so it can't rely on
+              text-balance — at the old 8vw / 7.5rem max it hit 36px and ran 475px
+              wide on a 390px phone (overflow), and leading-0.95 clipped the @ / j
+              descenders. Now: a min that fits a 360px screen (1.5rem), a vw term
+              that scales smoothly, and a max capped at 5rem (a 22-char address
+              never needs 120px). overflow-wrap:anywhere lets it break at the @ as
+              a last resort on the very narrowest devices instead of overflowing.
+              Leading lifted to 1.0 so descenders clear; pb keeps the baseline gap. */}
           <motion.span
             variants={emailReveal}
-            className="font-display block pb-[0.1em] text-[clamp(2.25rem,8vw,7.5rem)] leading-[0.95] text-balance text-ink/85 group-hover:text-ink transition-colors duration-700"
+            style={{ overflowWrap: "anywhere" }}
+            className="font-display block pb-[0.12em] text-[clamp(1.5rem,1rem+5vw,5rem)] leading-[1.02] text-ink/85 group-hover:text-ink transition-colors duration-700"
           >
             {email}
           </motion.span>
