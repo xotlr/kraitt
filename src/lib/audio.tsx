@@ -135,6 +135,13 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   // Music graph
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const musicSrcRef = useRef<MediaElementAudioSourceNode | null>(null);
+  // Spatial ("Dolby-like") chain on the audible path: stereo-widen → hall
+  // reverb (procedural convolver) → binaural HRTF panner → destination. The
+  // panner is held so the orbit loop can move the music in 3D with the signal.
+  // Desktop-only + skipped under reduced-motion (the analyser tap stays on the
+  // DRY source so metering/shader read the true signal, not the reverb tail).
+  const pannerRef = useRef<PannerNode | null>(null);
+  const spatialBuiltRef = useRef(false);
 
   // Mic graph
   const micStreamRef = useRef<MediaStream | null>(null);
@@ -247,6 +254,83 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     setCurrentTime(el.currentTime);
   }, []);
 
+  // Build a procedural HALL impulse response — a stereo, exponentially-decaying
+  // noise burst with an early-reflection cluster, so the convolver sounds like a
+  // real room/hall without shipping (or licensing) an IR file. ~2.6s tail.
+  const makeHallIR = useCallback((ctx: globalThis.AudioContext) => {
+    const rate = ctx.sampleRate;
+    const len = Math.floor(rate * 2.6);
+    const ir = ctx.createBuffer(2, len, rate);
+    for (let c = 0; c < 2; c++) {
+      const data = ir.getChannelData(c);
+      for (let i = 0; i < len; i++) {
+        const t = i / len;
+        // Exponential decay; the two channels decorrelate slightly for width.
+        const decay = Math.pow(1 - t, 2.4);
+        data[i] = (Math.random() * 2 - 1) * decay;
+      }
+      // A few discrete early reflections give the tail a "room", not just wash.
+      [0.011, 0.019, 0.027, 0.041].forEach((d, k) => {
+        const idx = Math.floor(d * rate);
+        if (idx < len) data[idx] += (0.5 - k * 0.1) * (c === 0 ? 1 : -1);
+      });
+    }
+    return ir;
+  }, []);
+
+  // Build the spatial chain and return its ENTRY node (what the source connects
+  // to) and the panner (held in pannerRef for the orbit loop). Topology:
+  //   entry(input gain)
+  //     ├── dry  ─────────────────────────────┐
+  //     ├── wide (Haas micro-delay, one side) ─┤
+  //     └── wet  → convolver(hall) ────────────┤
+  //                                            └→ panner(HRTF) → destination
+  const buildSpatialChain = useCallback(
+    (ctx: globalThis.AudioContext) => {
+      const input = ctx.createGain();
+
+      // Binaural panner — HRTF model = real 3D cues (the orbit loop moves it).
+      const panner = ctx.createPanner();
+      panner.panningModel = "HRTF";
+      panner.distanceModel = "inverse";
+      panner.refDistance = 1;
+      panner.maxDistance = 100;
+      panner.rolloffFactor = 0.4;
+      panner.positionZ.value = -1; // slightly in front
+      panner.connect(ctx.destination);
+      pannerRef.current = panner;
+
+      // Dry path — the direct sound (kept dominant so the music stays present).
+      const dry = ctx.createGain();
+      dry.gain.value = 0.78;
+      input.connect(dry);
+      dry.connect(panner);
+
+      // Width path — a Haas micro-delay (~12ms) on a parallel copy widens the
+      // stereo image past the speakers without smearing the centre.
+      const wide = ctx.createDelay(0.05);
+      wide.delayTime.value = 0.012;
+      const wideGain = ctx.createGain();
+      wideGain.gain.value = 0.32;
+      input.connect(wide);
+      wide.connect(wideGain);
+      wideGain.connect(panner);
+
+      // Wet path — the hall reverb, mixed under the dry so it reads as space,
+      // not a tunnel.
+      const convolver = ctx.createConvolver();
+      convolver.buffer = makeHallIR(ctx);
+      const wet = ctx.createGain();
+      wet.gain.value = 0.26;
+      input.connect(convolver);
+      convolver.connect(wet);
+      wet.connect(panner);
+
+      return input;
+    },
+    [makeHallIR]
+  );
+
   // Decode the MP3 ONCE into a static waveform peak-print (like a DAW clip).
   // Lazy: fetched + decoded the first time music starts, so it costs nothing
   // until the user engages audio. We downsample the decoded PCM into BAR_COUNT
@@ -339,11 +423,32 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       // Decode the static waveform print once, lazily, now that audio is live.
       void decodeWaveform(ctx);
       const src = ctx.createMediaElementSource(el);
-      // Music graph: source -> destination (audible) and source -> analyser
-      // (metering tap). The analyser is NOT chained to destination, so the
-      // mic — which only feeds the tap — never reaches the speakers.
-      src.connect(ctx.destination);
+      // Music graph. The metering tap ALWAYS reads the DRY source (so the VU,
+      // EQ and shader see the true signal, not the reverb tail):
       src.connect(analyserRef.current!);
+
+      // Audible path. On capable displays (desktop, motion allowed) it runs
+      // through the spatial "Dolby-like" chain (widen → hall → HRTF orbit);
+      // otherwise it's the plain direct connection. Built once. Reduced-motion
+      // and mobile keep the dry, cheap path so the perf gates hold and the
+      // effect never plays where it can't be heard / shouldn't run.
+      const allowSpatial =
+        typeof window !== "undefined" &&
+        window.matchMedia("(min-width: 1024px)").matches &&
+        !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (allowSpatial && !spatialBuiltRef.current) {
+        try {
+          const entry = buildSpatialChain(ctx);
+          src.connect(entry);
+          spatialBuiltRef.current = true;
+        } catch {
+          // Any node-construction failure → fall back to a direct connection so
+          // audio still plays.
+          src.connect(ctx.destination);
+        }
+      } else {
+        src.connect(ctx.destination);
+      }
       musicSrcRef.current = src;
     }
     const el = audioElRef.current;
@@ -487,6 +592,11 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     const VU_COEFF = 0.06;
     let rmsBallistic = 0;
 
+    // Spatial orbit phase. The HRTF panner slowly circles the listener; the beat
+    // (lv.bass) nudges the radius so the music "leans" outward on hits. Only runs
+    // when the spatial chain exists (desktop, motion allowed); otherwise a no-op.
+    let orbitPhase = 0;
+
     const tick = () => {
       analyser.getByteFrequencyData(buf);
       let bSum = 0,
@@ -598,6 +708,23 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         reactiveHigh > lv.high
           ? lv.high + (reactiveHigh - lv.high) * ATTACK
           : lv.high + (reactiveHigh - lv.high) * RELEASE;
+
+      // ── 3D orbit: move the music around the listener (binaural) ──────────
+      const panner = pannerRef.current;
+      if (panner) {
+        // Slow base orbit (~one revolution every ~24s); the beat swells the
+        // radius so hits push the source outward and it settles back between.
+        orbitPhase += 0.0045;
+        const radius = 1.4 + lv.bass * 1.1;
+        const x = Math.sin(orbitPhase) * radius;
+        const z = -0.6 - Math.cos(orbitPhase) * radius * 0.5; // stays front-ish
+        const y = Math.sin(orbitPhase * 0.5) * 0.3 * (0.4 + lv.high);
+        // setValueAtTime would queue ramps; direct .value writes are fine at
+        // frame rate and avoid automation-event buildup.
+        panner.positionX.value = x;
+        panner.positionY.value = y;
+        panner.positionZ.value = z;
+      }
 
       raf = requestAnimationFrame(tick);
     };
