@@ -480,6 +480,22 @@ html.light {
     text-transform: uppercase;
     color: var(--color-ink-muted);
   }
+
+  /* Mono meta-label — the small engraved 10px caps that tag project rows, fact
+     grids, credits, filters and footer links. This exact triple (mono · 10px ·
+     uppercase) was repeated ~14× across the sections; it lives here now so the
+     register is one source of truth. The most common track (0.18em) is the
+     default, so most call sites need only `mono-label`; the few wider tracks
+     (filters/credits at 0.2–0.25em) keep a `tracking-[…]` override. No colour
+     baked in — callers pick faint/muted/ink as before. */
+  .mono-label {
+    font-family: var(--font-mono), monospace;
+    font-weight: var(--weight-mono);
+    font-size: 10px;
+    line-height: 1.4;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
 }
 
 @layer components {

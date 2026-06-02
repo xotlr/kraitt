@@ -25,3 +25,18 @@ export const makeStagger = (children = 0.08, delay = 0.05): Variants => ({
   hidden: {},
   visible: { transition: { staggerChildren: children, delayChildren: delay } },
 });
+
+/**
+ * The scroll-reveal trigger every section shares: start hidden, play once when
+ * the block scrolls into view, fire a touch before its top edge clears. Spread
+ * onto any motion element driving a variants reveal — `<motion.div {...reveal}
+ * variants={…}>` — so the four-line incantation lives in one place. The variants
+ * (which shapes animate) stay at the call site; only the trigger is shared.
+ * (SectionHeading keeps its own -12% margin — a deliberately different cue, not
+ * a copy of this one.)
+ */
+export const reveal = {
+  initial: "hidden",
+  whileInView: "visible",
+  viewport: { once: true, margin: "-10%" },
+} as const;

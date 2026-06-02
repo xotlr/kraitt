@@ -5,7 +5,7 @@ import { Accent } from "@/components/accent";
 import { SectionHeading } from "@/components/section-heading";
 import { useLanguage } from "@/lib/language-context";
 import { dict } from "@/lib/i18n";
-import { drawX as mkDrawX, fadeUp as mkFadeUp, makeStagger } from "@/lib/motion";
+import { drawX as mkDrawX, fadeUp as mkFadeUp, makeStagger, reveal } from "@/lib/motion";
 
 const columnStagger = makeStagger(0.12, 0.05);
 const itemStagger = makeStagger(0.08, 0.15);
@@ -36,9 +36,7 @@ export function Leistungen() {
 
         <motion.div
           variants={columnStagger}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-10%" }}
+          {...reveal}
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-14 md:gap-10 lg:gap-16"
         >
           {columns.map((col) => (
@@ -73,7 +71,7 @@ export function Leistungen() {
                       <span className="font-body text-lg md:text-xl text-ink/90 group-hover:text-ink transition-colors duration-500">
                         {item.name}
                       </span>
-                      <span className="hidden lg:block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint text-right max-w-[55%]">
+                      <span className="hidden lg:block mono-label text-ink-faint text-right max-w-[55%]">
                         {item.desc}
                       </span>
                     </div>

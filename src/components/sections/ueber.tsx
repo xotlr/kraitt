@@ -6,7 +6,7 @@ import { SectionHeading } from "@/components/section-heading";
 import { useLanguage } from "@/lib/language-context";
 import { dict } from "@/lib/i18n";
 import { useAudioGlow } from "@/hooks/use-audio-glow";
-import { drawX as mkDrawX, fadeUp as mkFadeUp, makeStagger } from "@/lib/motion";
+import { drawX as mkDrawX, fadeUp as mkFadeUp, makeStagger, reveal } from "@/lib/motion";
 
 const stagger = makeStagger(0.08, 0.1);
 const fadeUp = mkFadeUp(18);
@@ -41,9 +41,7 @@ export function Ueber() {
           <motion.div
             ref={proseRef}
             variants={stagger}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-10%" }}
+            {...reveal}
             className="lg:col-span-7 lg:col-start-2 space-y-7 text-body-lg leading-[var(--text-body-lg--line-height)] text-ink/80 font-body text-pretty text-legible"
           >
             <motion.p variants={fadeUp}>
@@ -63,9 +61,7 @@ export function Ueber() {
 
           <motion.div
             variants={stagger}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-10%" }}
+            {...reveal}
             className="lg:col-span-3 lg:col-start-10"
           >
             {/* A key/value fact grid. This is a styled list of label→value
@@ -73,7 +69,7 @@ export function Ueber() {
                 <dl> — which lets each row also hold the animated hairline span
                 without tripping axe's strict definition-list structure rule.
                 The label/value relationship is conveyed visually + by order. */}
-            <ul className="space-y-4 font-mono text-[10px] uppercase tracking-[0.18em]">
+            <ul className="space-y-4 mono-label">
               {t.facts.map((f) => (
                 <motion.li
                   key={f.k}

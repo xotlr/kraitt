@@ -9,6 +9,7 @@ import {
   drawX as mkDrawX,
   fadeUp as mkFadeUp,
   makeStagger,
+  reveal,
 } from "@/lib/motion";
 
 const stagger = makeStagger(0.08, 0.05);
@@ -50,9 +51,7 @@ export function Kontakt() {
         <motion.a
           href={`mailto:${email}`}
           variants={stagger}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-10%" }}
+          {...reveal}
           className="group block py-12 md:py-20"
         >
           <motion.span
@@ -76,9 +75,7 @@ export function Kontakt() {
 
         <motion.footer
           variants={stagger}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-10%" }}
+          {...reveal}
           className="relative mt-24 pt-8"
         >
           <motion.span
@@ -94,7 +91,7 @@ export function Kontakt() {
 
             <motion.ul
               variants={stagger}
-              className="flex flex-wrap gap-x-5 gap-y-2 md:gap-7 font-mono text-[10px] uppercase tracking-[0.22em]"
+              className="flex flex-wrap gap-x-5 gap-y-2 md:gap-7 mono-label tracking-[0.22em]"
             >
               {links.map((l) => (
                 <motion.li key={l.label} variants={fadeUp}>

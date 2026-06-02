@@ -19,6 +19,7 @@ import {
   drawX as mkDrawX,
   fadeUp as mkFadeUp,
   makeStagger,
+  reveal,
 } from "@/lib/motion";
 
 /** A project merged with its localized copy for the active language. */
@@ -74,10 +75,8 @@ export function Referenzen() {
 
         <motion.div
           variants={filterStagger}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-10%" }}
-          className="mb-14 flex flex-wrap gap-x-8 gap-y-3 font-mono text-[10px] uppercase tracking-[0.22em]"
+          {...reveal}
+          className="mb-14 flex flex-wrap gap-x-8 gap-y-3 mono-label tracking-[0.22em]"
         >
           {t.categories.map((c) => {
             const id = c.id as Category | "all";
@@ -111,9 +110,7 @@ export function Referenzen() {
 
         <motion.div
           variants={listContainer}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-10%" }}
+          {...reveal}
           className="relative"
         >
           <motion.span
@@ -144,26 +141,26 @@ export function Referenzen() {
                         on one line beside the title. Stacking is
                         cleaner and reads faster on small screens. */}
                     <div className="flex items-baseline justify-between lg:hidden mb-2">
-                      <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-faint">
+                      <span className="mono-label tracking-[0.2em] text-ink-faint">
                         {String(i + 1).padStart(2, "0")}
                       </span>
-                      <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">
+                      <span className="mono-label text-ink-faint">
                         {p.year}
                       </span>
                     </div>
-                    <span className="hidden lg:block lg:col-span-1 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-faint">
+                    <span className="hidden lg:block lg:col-span-1 mono-label tracking-[0.2em] text-ink-faint">
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <span className="block lg:col-span-5 font-heading text-2xl md:text-[2rem] transition-colors duration-500 group-hover:text-ink">
                       {p.title}
                     </span>
-                    <span className="mt-3 lg:mt-0 block lg:col-span-3 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+                    <span className="mt-3 lg:mt-0 block lg:col-span-3 mono-label text-ink-muted">
                       {p.role}
                     </span>
-                    <span className="mt-1 lg:mt-0 block lg:col-span-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted">
+                    <span className="mt-1 lg:mt-0 block lg:col-span-2 mono-label text-ink-muted">
                       {p.medium.split(", ")[0]}
                     </span>
-                    <span className="hidden lg:block lg:col-span-1 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint text-right">
+                    <span className="hidden lg:block lg:col-span-1 mono-label text-ink-faint text-right">
                       {p.year}
                     </span>
 
@@ -185,17 +182,17 @@ export function Referenzen() {
         <DialogContent>
           {active && (
             <>
-              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink-muted mb-2">
+              <div className="mono-label tracking-[0.25em] text-ink-muted mb-2">
                 {active.year} · {active.client}
               </div>
               <DialogTitle>{active.title}</DialogTitle>
-              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-muted mt-1 mb-5">
+              <div className="mono-label tracking-[0.2em] text-ink-muted mt-1 mb-5">
                 {active.role} · {active.medium}
               </div>
               <DialogDescription className="text-base md:text-lg leading-[1.65] font-body">
                 {active.description}
               </DialogDescription>
-              <dl className="mt-7 pt-6 border-t border-hairline grid grid-cols-3 gap-4 font-mono text-[10px] uppercase tracking-[0.18em]">
+              <dl className="mt-7 pt-6 border-t border-hairline grid grid-cols-3 gap-4 mono-label">
                 {active.credits.map((c) => (
                   <div key={c.label}>
                     <dt className="text-ink-faint mb-1">{c.label}</dt>
@@ -208,7 +205,7 @@ export function Referenzen() {
                   href={active.link.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group mt-7 inline-flex items-baseline gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-muted transition-colors duration-500 hover:text-ink"
+                  className="group mt-7 inline-flex items-baseline gap-2 mono-label tracking-[0.2em] text-ink-muted transition-colors duration-500 hover:text-ink"
                 >
                   <span className="relative">
                     {active.link.label}
