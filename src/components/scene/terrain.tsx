@@ -129,6 +129,32 @@ const vertexShader = /* glsl */ `
     float audioMid  = midEase  * (0.7 + 0.4 * midField);
     float audioHigh = highEase * (0.7 + 0.4 * highField);
 
+    // ---- DIFFRACTION vs. LOCALIZATION (the wavelength→spread law) ----
+    // Real waves: a LONG (deep) wave diffracts — it bends around things and
+    // spreads to fill the whole field; a SHORT (high) wave behaves like a ray,
+    // staying near where it was struck and dying off fast with distance. The
+    // sound's "source" is the origin (same epicenter the radial pulse rings
+    // from). We gate each band's energy by a radial envelope keyed to distance
+    // from that source: bass falls off slowly (reaches the far field), highs
+    // fall off steeply (cluster at the center). radius is the in-plane
+    // distance — the same quantity the radial pulse uses below, computed once
+    // here so both share it.
+    float radius = length(position.xy);
+    // Falloff rate per band. Lower k = broader spread (more diffraction). Bass
+    // is nearly flat across the plane; highs collapse to a tight core. These
+    // are the wave's "reach". Mid sits between. (exp(-r*k): bass ~0.6 at the
+    // far edge, high ~0.001 — so a high hit is a localized sparkle, a low hit a
+    // field-wide swell.)
+    float bassReach = exp(-radius * 0.045);
+    float midReach  = exp(-radius * 0.16);
+    float highReach = exp(-radius * 0.42);
+    // Apply the reach. We keep a small floor on bass/mid (they still EXIST out
+    // wide, just attenuated) but let highs go fully local — that contrast is
+    // the whole point of "deep bends, high repels".
+    audioBass *= 0.45 + 0.55 * bassReach;
+    audioMid  *= 0.30 + 0.70 * midReach;
+    audioHigh *= highReach;
+
     // Wave time multipliers reduced a further ~40% (was already halved
     // once). Even slower ocean now: big swells over ~25 seconds, chop
     // ~10-13 seconds, ripples ~5-7 seconds.
@@ -163,17 +189,45 @@ const vertexShader = /* glsl */ `
     float leanRp1 = mix(1.0, abs(dot(normalize(dirRp1), uDir)), leanAmount);
     float leanRp2 = mix(1.0, abs(dot(normalize(dirRp2), uDir)), leanAmount);
 
+    // The two SWELL bands (bass) propagate straight — long waves pass through
+    // obstacles rather than glancing off them. We compute their args first
+    // because their SLOPE is what the short ripples will scatter against.
     float argBig = dot(dirBig, position.xy) * frqBig * leanBig + uTime * 0.24;
     float argCrs = dot(dirCrs, position.xy) * frqCrs * leanCrs + uTime * 0.17 + 1.7;
-    float argCh1 = dot(dirCh1, position.xy) * frqCh1 * leanCh1 + uTime * 0.42 + 0.5;
-    float argCh2 = dot(dirCh2, position.xy) * frqCh2 * leanCh2 + uTime * 0.51 + 3.0;
-    float argRp1 = dot(dirRp1, position.xy) * frqRp1 * leanRp1 + uTime * 0.87;
-    float argRp2 = dot(dirRp2, position.xy) * frqRp2 * leanRp2 + uTime * 0.99 + 2.2;
+
+    // ---- SCATTER / REFRACTION (high waves glance off the swell) ----
+    // Short waves act like rays: when they cross a longer wave's slope they
+    // refract/deflect off it. Long waves don't — they roll straight through.
+    // We deflect each RIPPLE's heading by the in-plane SLOPE of the bass swell
+    // (the gradient of bigSwell+crossSwell), which we get for free from the
+    // analytic cosines we'd compute for the normal anyway. The deflection is
+    // perpendicular-biased (a ray bends ACROSS the gradient it climbs), scaled
+    // by how loud the high band is, so ripples only skitter and break up on a
+    // real high hit and run clean when the highs are quiet. Mid chop deflects a
+    // little (half), bass not at all — that gradient of "bends more / repels
+    // more" down the spectrum is the law you described.
+    vec2 swellSlope =
+      cos(argBig) * dirBig * frqBig * leanBig * ampBig +
+      cos(argCrs) * dirCrs * frqCrs * leanCrs * ampCrs;
+    // Rotate the slope 90° to get the deflection axis (rays bend across, not
+    // along, the slope), and gate by the high energy so it's audio-driven.
+    vec2 deflect = vec2(-swellSlope.y, swellSlope.x);
+    vec2 dirRp1d = normalize(dirRp1 + deflect * (3.2 * audioHigh));
+    vec2 dirRp2d = normalize(dirRp2 + deflect * (3.8 * audioHigh));
+    // Mid chop scatters a touch (between bass-straight and high-skitter).
+    vec2 dirCh1d = normalize(dirCh1 + deflect * (1.1 * audioMid));
+    vec2 dirCh2d = normalize(dirCh2 + deflect * (1.3 * audioMid));
+
+    // Recompute the chop/ripple args off their DEFLECTED headings.
+    float argCh1s = dot(dirCh1d, position.xy) * frqCh1 * leanCh1 + uTime * 0.42 + 0.5;
+    float argCh2s = dot(dirCh2d, position.xy) * frqCh2 * leanCh2 + uTime * 0.51 + 3.0;
+    float argRp1 = dot(dirRp1d, position.xy) * frqRp1 * leanRp1 + uTime * 0.87;
+    float argRp2 = dot(dirRp2d, position.xy) * frqRp2 * leanRp2 + uTime * 0.99 + 2.2;
 
     float bigSwell  = sin(argBig) * ampBig;
     float crossSwell = sin(argCrs) * ampCrs;
-    float chop1     = sin(argCh1) * ampCh1;
-    float chop2     = sin(argCh2) * ampCh2;
+    float chop1     = sin(argCh1s) * ampCh1;
+    float chop2     = sin(argCh2s) * ampCh2;
     float ripple1   = sin(argRp1) * ampRp1;
     float ripple2   = sin(argRp2) * ampRp2;
 
@@ -184,7 +238,7 @@ const vertexShader = /* glsl */ `
     // decays, so the crest sweeps outward and fades. This is the most
     // literal "spatial wave" — a disturbance with an epicenter that
     // propagates. Damped by distance so it dies out toward the horizon.
-    float radius = length(position.xy);
+    // (radius is computed up top, alongside the diffraction envelopes.)
     float ringPhase = radius * 1.1 - uPulse * 9.0;       // crest travels out as pulse rises
     float ringEnv = uPulse * (1.0 - uPulse);             // 0 at rest & full, peaks mid-pulse
     float radialPulse =
@@ -233,21 +287,25 @@ const vertexShader = /* glsl */ `
     // without them.
     // (frequency factors include the §7.2 lean so the normal matches the
     // leaned surface — lean is constant in x/y so it passes through the
-    // chain rule as a plain multiplier.)
+    // chain rule as a plain multiplier. The chop/ripple terms use their
+    // DEFLECTED headings + args so the normal matches the scattered surface;
+    // like lean, the deflection direction is treated as locally constant — its
+    // own spatial variation is a small high-order term we drop, same trade the
+    // lean simplification already makes.)
     float dHdx =
       cos(argBig) * dirBig.x * frqBig * leanBig * ampBig * wBig +
       cos(argCrs) * dirCrs.x * frqCrs * leanCrs * ampCrs * wCrs +
-      cos(argCh1) * dirCh1.x * frqCh1 * leanCh1 * ampCh1 * wCh1 +
-      cos(argCh2) * dirCh2.x * frqCh2 * leanCh2 * ampCh2 * wCh2 +
-      cos(argRp1) * dirRp1.x * frqRp1 * leanRp1 * ampRp1 * wRp1 +
-      cos(argRp2) * dirRp2.x * frqRp2 * leanRp2 * ampRp2 * wRp2;
+      cos(argCh1s) * dirCh1d.x * frqCh1 * leanCh1 * ampCh1 * wCh1 +
+      cos(argCh2s) * dirCh2d.x * frqCh2 * leanCh2 * ampCh2 * wCh2 +
+      cos(argRp1) * dirRp1d.x * frqRp1 * leanRp1 * ampRp1 * wRp1 +
+      cos(argRp2) * dirRp2d.x * frqRp2 * leanRp2 * ampRp2 * wRp2;
     float dHdy =
       cos(argBig) * dirBig.y * frqBig * leanBig * ampBig * wBig +
       cos(argCrs) * dirCrs.y * frqCrs * leanCrs * ampCrs * wCrs +
-      cos(argCh1) * dirCh1.y * frqCh1 * leanCh1 * ampCh1 * wCh1 +
-      cos(argCh2) * dirCh2.y * frqCh2 * leanCh2 * ampCh2 * wCh2 +
-      cos(argRp1) * dirRp1.y * frqRp1 * leanRp1 * ampRp1 * wRp1 +
-      cos(argRp2) * dirRp2.y * frqRp2 * leanRp2 * ampRp2 * wRp2;
+      cos(argCh1s) * dirCh1d.y * frqCh1 * leanCh1 * ampCh1 * wCh1 +
+      cos(argCh2s) * dirCh2d.y * frqCh2 * leanCh2 * ampCh2 * wCh2 +
+      cos(argRp1) * dirRp1d.y * frqRp1 * leanRp1 * ampRp1 * wRp1 +
+      cos(argRp2) * dirRp2d.y * frqRp2 * leanRp2 * ampRp2 * wRp2;
     // Local-space normal: surface is z = H(x,y), so the (unnormalized)
     // normal is (-dHdx, -dHdy, 1). normalMatrix carries it to world
     // space (mesh has uniform scale, so this is exact).
