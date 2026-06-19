@@ -30,31 +30,52 @@ export async function waitForScene(page: Page): Promise<void> {
 }
 
 /**
- * Count how many times the scene actually renders over `ms` milliseconds.
- * Each capped frame issues several fullscreen postfx draws via drawArrays; we
- * count the postfx passes per frame once, then divide, to recover the frame
- * rate. Returns both the raw draw count and the inferred renders/sec.
+ * Measure how many times the scene actually renders over `ms` milliseconds.
+ *
+ * A single capped frame issues MANY GPU draws — under the WebGPU node pipeline
+ * (WebGL2 backend in CI) one frame is terrain + atmosphere + the bloom mip
+ * chain + chromatic aberration + SMAA + tone/grade passes, ~22 draws split
+ * across BOTH drawArrays and drawElements. So we can't infer the frame rate by
+ * dividing a draw count by a separately-sampled passes-per-frame (the old
+ * method: it under-counted by ignoring drawElements and mismatched sample
+ * windows). Instead we timestamp every draw and count FRAME BOUNDARIES — a gap
+ * > 12ms between consecutive draws marks a new frame, since the FrameCap pump
+ * spaces frames ≥ 33ms (30fps) / 50ms (20fps) apart while the draws within one
+ * frame fire back-to-back. That recovers the true render cadence regardless of
+ * how many passes each frame contains.
+ *
+ * Returns the measured renders/sec, raw draw count, and rAF ticks (liveness).
  */
 export async function measureRenderRate(
   page: Page,
   ms: number
-): Promise<{ drawArrays: number; rafs: number }> {
+): Promise<{ rendersPerSec: number; draws: number; rafs: number }> {
   return page.evaluate(async (duration) => {
     const c = document.querySelector(
       "canvas[data-engine]"
     ) as HTMLCanvasElement;
     const gl = (c.getContext("webgl2") ||
       c.getContext("webgl")) as WebGLRenderingContext | null;
-    if (!gl) return { drawArrays: -1, rafs: -1 };
+    if (!gl) return { rendersPerSec: -1, draws: -1, rafs: -1 };
 
     let draws = 0;
     let rafs = 0;
-    const orig = gl.drawArrays.bind(gl);
-    (gl as WebGLRenderingContext).drawArrays = function (
+    const times: number[] = [];
+    const origDA = gl.drawArrays.bind(gl);
+    const origDE = gl.drawElements.bind(gl);
+    gl.drawArrays = function (
       ...a: Parameters<WebGLRenderingContext["drawArrays"]>
     ) {
       draws++;
-      return orig(...a);
+      times.push(performance.now());
+      return origDA(...a);
+    };
+    gl.drawElements = function (
+      ...a: Parameters<WebGLRenderingContext["drawElements"]>
+    ) {
+      draws++;
+      times.push(performance.now());
+      return origDE(...a);
     };
 
     const t0 = performance.now();
@@ -67,8 +88,16 @@ export async function measureRenderRate(
       requestAnimationFrame(tick);
     });
 
-    (gl as WebGLRenderingContext).drawArrays = orig;
-    return { drawArrays: draws, rafs };
+    gl.drawArrays = origDA;
+    gl.drawElements = origDE;
+
+    // Count frame boundaries: a gap > 12ms between draws starts a new frame.
+    let frames = times.length > 0 ? 1 : 0;
+    for (let i = 1; i < times.length; i++) {
+      if (times[i] - times[i - 1] > 12) frames++;
+    }
+    const rendersPerSec = frames / (duration / 1000);
+    return { rendersPerSec, draws, rafs };
   }, ms);
 }
 

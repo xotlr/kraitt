@@ -1,621 +1,453 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import * as THREE from "three";
+import {
+  abs,
+  add,
+  cameraPosition,
+  clamp,
+  cos,
+  Discard,
+  dot,
+  exp,
+  float,
+  floor,
+  Fn,
+  fract,
+  fwidth,
+  length,
+  Loop,
+  max,
+  mix as tslMix,
+  modelNormalMatrix,
+  modelWorldMatrix,
+  mul,
+  normalize,
+  oneMinus,
+  positionGeometry,
+  pow,
+  sin,
+  smoothstep,
+  uniform,
+  varying,
+  vec2,
+  vec3,
+  vec4,
+} from "three/tsl";
+import { MeshBasicNodeMaterial, type Node } from "three/webgpu";
 import { useAudioLevels } from "@/lib/audio";
-import { useTheme } from "@/lib/theme-context";
-import { assertUniformsUsed } from "./assert-uniforms";
-import { SIMPLEX_3D } from "./glsl-noise";
+import { useThemeMix } from "@/hooks/use-theme-mix";
+import { snoise3 } from "./tsl-noise";
 
 /**
- * Terrain — a real 3D plane laid flat on the ground, displaced by FBM
- * noise into a topographic landscape. The fragment shader draws gold
- * contour lines at fixed world-y intervals; because the surface is
- * actually 3D, contour density varies naturally with slope (lines
- * crowd on steep peaks, spread on flats).
+ * Terrain — a real 3D plane laid flat on the ground, displaced by layered
+ * traveling waves into an audio-reactive ocean. The fragment node draws gold
+ * contour lines at fixed world-y intervals; because the surface is genuinely
+ * 3D, contour density varies with slope (lines crowd on peaks, spread on
+ * flats). Ported to TSL so it runs on the WebGPU renderer.
  *
- * Scroll motion is supplied by the camera dolly in CameraRig, not here —
- * the terrain field evolves in place (FBM over a time axis) and the camera
+ * Scroll motion is supplied by the camera dolly in CameraRig, not here — the
+ * terrain field evolves in place (waves + FBM over a time axis) and the camera
  * travels across it as the page scrolls.
  *
  * Audio reactivity:
- *   - bass: amplifies displacement (peaks rise) + tightens contour
- *     spacing (lines crowd globally during musical hits)
- *   - mid:  speeds noise drift
- *   - high: sharpens contour line edges
- *
- * Contour math: standard fract/derivative trick. Lines are pixel-stable
- * because we divide by fwidth(worldY), so they read crisp at any slope
- * or camera distance.
+ *   - bass: amplifies displacement (peaks rise) + tightens contour spacing
+ *   - mid:  speeds noise drift + the conductor sweep
+ *   - high: sharpens contour line edges + scatters the ripples
  *
  * References:
  *   - The Book of Shaders, "Truchet / Contour" patterns
- *   - Inigo Quilez, "Filtering a contour"
+ *   - Inigo Quilez, "Filtering a contour" / "Elevated"
  */
 
-const PLANE_SIZE = 30;          // world-units wide and deep
-const SEGMENTS = 160;            // 160x160 ≈ 25k tris. Was 220 (97k);
-                                 // perf audit flagged FBM-per-vertex
-                                 // as the scene's main cost. At 160
-                                 // the displacement still reads smooth
-                                 // and we get ~50% less vertex work.
+const PLANE_SIZE = 30; // world-units wide and deep
+const SEGMENTS = 160; // 160x160 ≈ 25k tris (the perf-audited segment count).
 
-const vertexShader = /* glsl */ `
-  uniform float uTime;
-  uniform float uBass;
-  uniform float uMid;
-  uniform float uHigh;
-  uniform float uPulse;       // 0->1 radial pulse envelope (beat hits + manual plucks)
-  uniform vec2 uDir;          // auto-conductor heading (unit vec2 on the ground plane; §6)
-  varying float vWorldY;
-  varying vec3 vWorldPos;
-  varying float vCameraDist;
-  varying float vHeightNorm;
-  varying vec3 vNormal;       // world-space surface normal (analytic, from the sine sum)
+// Concrete uniform types (via the factory's ReturnType) so the node-element
+// methods (.mul/.x/...) resolve — `ReturnType<typeof uniform>` alone collapses
+// the generic to unknown and drops them.
+function makeUniforms() {
+  return {
+    uTime: uniform(0),
+    uBass: uniform(0),
+    uMid: uniform(0),
+    uHigh: uniform(0),
+    uPulse: uniform(0),
+    uTheme: uniform(0),
+    // Horizon haze tint — lerped per-theme to match the atmosphere bed.
+    uFogColor: uniform(new THREE.Color(0, 0, 0)),
+    // Auto-conductor heading — a unit vec2 swept by an LFO. Starts at +x.
+    uDir: uniform(new THREE.Vector2(1, 0)),
+  };
+}
+type Uniforms = ReturnType<typeof makeUniforms>;
 
-  ${SIMPLEX_3D}
-  // FBM that takes time as the z-axis of 3D simplex noise — this is
-  // what makes the terrain genuinely EVOLVE in place rather than
-  // translate. Each octave advances at a faster time rate (small
-  // detail boils faster, large structure drifts slower), matching the
-  // standard "shifting dunes" technique (IQ Elevated, ShaderToy
-  // Xll3RM, Marching Desert).
-  float fbm(vec2 p, float t) {
-    float v = 0.0;
-    float a = 0.55;
-    float tz = t;
-    for (int i = 0; i < 4; i++) {
-      v += a * snoise(vec3(p, tz));
-      p = p * 1.9 + vec2(31.4, 17.7);
-      a *= 0.5;
-      tz *= 1.6;  // higher octaves animate faster
-    }
-    return v;
-  }
+// FBM that takes time as the z-axis of 3D simplex noise — what makes the
+// terrain genuinely EVOLVE in place rather than translate. Each octave
+// advances at a faster time rate (small detail boils faster, large structure
+// drifts slower).
+const fbm = Fn(([p, t]: [Node<"vec2">, Node<"float">]) => {
+  const v = float(0).toVar();
+  const a = float(0.55).toVar();
+  const tz = t.toVar();
+  const pp = p.toVar();
+  Loop(4, () => {
+    v.addAssign(a.mul(snoise3(vec3(pp, tz))));
+    pp.assign(pp.mul(1.9).add(vec2(31.4, 17.7)));
+    a.mulAssign(0.5);
+    tz.mulAssign(1.6); // higher octaves animate faster
+  });
+  return v;
+});
 
-  void main() {
-    // ---- AUDIO OCEAN ----
-    // The surface is water, not terrain. Six layered traveling sine
-    // waves at different frequencies, directions, and speeds — a
-    // simplified Gerstner-style ocean. Each wave moves continuously
-    // across the surface; together they create the irregular swell
-    // of a real sea. Audio bands drive amplitude per layer.
-    //
-    // Wave i: amplitude * sin(dot(direction, position) * freq + time * speed + phase)
-    //
-    // Wave 1: big slow primary swell — the dominant ocean rhythm.
-    //         Bass amplifies it dramatically (a 0.5 bass peak nearly
-    //         doubles the swell height).
-    // Wave 2: secondary swell, perpendicular direction, slower.
-    // Wave 3-4: medium chop, faster, smaller. Mid frequencies drive.
-    // Wave 5-6: high-frequency surface ripple. Highs drive.
-    // Idle = calm sea, audio = real waves. Amplitudes reduced ~40%
-    // from previous tuning so the surface stays smooth/inviting,
-    // peaks don't heave dramatically. Lower-frequency components
-    // dominate so the result reads as broad ocean swell, not chop.
-    // Gentle gamma. The old 1.5 curve crushed mid-level beats (a 0.5
-    // hit became 0.35 before the field floor halved it again), so the
-    // surface barely rose. 1.1 keeps a little toe to suppress noise but
-    // lets real beats through close to 1:1.
-    float bassEase = pow(uBass, 1.1);
-    float midEase = pow(uMid, 1.1);
-    float highEase = pow(uHigh, 1.1);
+// ---- varyings the vertex node writes and the fragment node reads ----
+const vWorldY = varying(float(0));
+const vWorldPos = varying(vec3(0));
+const vCameraDist = varying(float(0));
+const vHeightNorm = varying(float(0));
+const vNormal = varying(vec3(0));
 
-    // ---- SPATIAL AUDIO ENERGY ----
-    // The old version multiplied every wave by a single global band
-    // value, so the whole plane heaved in unison — a uniform pump, not
-    // a sea. Here each band's energy TRAVELS across the surface as a
-    // moving field, so a hit reads as a wavefront sweeping through the
-    // water rather than the entire surface lifting at once.
-    //
-    // Each "audioField" is a slow large-scale ripple in *amplitude*
-    // (not height) that drifts in its own direction. Where the field is
-    // high, that band's waves are tall; where it's low, they're flat.
-    // The field itself moves, so the tall region moves — energy with a
-    // location and a velocity. Different directions per band keep them
-    // from peaking together.
-    float bassField = 0.5 + 0.5 * sin(dot(vec2(0.9, 0.35), position.xy) * 0.22 - uTime * 0.30);
-    float midField  = 0.5 + 0.5 * sin(dot(vec2(-0.4, 0.95), position.xy) * 0.40 + uTime * 0.55);
-    float highField = 0.5 + 0.5 * sin(dot(vec2(0.6, -0.8), position.xy) * 0.70 + uTime * 0.95 + 1.3);
+/**
+ * The displacement + analytic-normal computation, shared by positionNode (it
+ * returns the displaced local position) and — via the varyings it writes — the
+ * fragment colour. Mirrors the original GLSL main() exactly.
+ */
+function buildVertexNode(u: Uniforms) {
+  return Fn(() => {
+    const position = positionGeometry; // local XY plane (pre-rotation)
 
-    // Band energy = global level shaped by its traveling field. The
-    // field MODULATES the energy spatially but no longer starves it: the
-    // floor is high (0.7) so a beat lifts the whole surface, while the
-    // field still adds ~40% extra height where it peaks — that's the
-    // travelling wavefront. Previously the floor was 0.45/0.35, which
-    // combined with the gamma meant beats barely registered.
-    float audioBass = bassEase * (0.7 + 0.4 * bassField);
-    float audioMid  = midEase  * (0.7 + 0.4 * midField);
-    float audioHigh = highEase * (0.7 + 0.4 * highField);
+    // ---- AUDIO OCEAN ---- (gentle gamma; keeps a toe to suppress noise but
+    // lets real beats through close to 1:1)
+    const bassEase = pow(u.uBass, 1.1);
+    const midEase = pow(u.uMid, 1.1);
+    const highEase = pow(u.uHigh, 1.1);
 
-    // ---- DIFFRACTION vs. LOCALIZATION (the wavelength→spread law) ----
-    // Real waves: a LONG (deep) wave diffracts — it bends around things and
-    // spreads to fill the whole field; a SHORT (high) wave behaves like a ray,
-    // staying near where it was struck and dying off fast with distance. The
-    // sound's "source" is the origin (same epicenter the radial pulse rings
-    // from). We gate each band's energy by a radial envelope keyed to distance
-    // from that source: bass falls off slowly (reaches the far field), highs
-    // fall off steeply (cluster at the center). radius is the in-plane
-    // distance — the same quantity the radial pulse uses below, computed once
-    // here so both share it.
-    float radius = length(position.xy);
-    // Falloff rate per band. Lower k = broader spread (more diffraction). Bass
-    // is nearly flat across the plane; highs collapse to a tight core. These
-    // are the wave's "reach". Mid sits between. (exp(-r*k): bass ~0.6 at the
-    // far edge, high ~0.001 — so a high hit is a localized sparkle, a low hit a
-    // field-wide swell.)
-    float bassReach = exp(-radius * 0.045);
-    float midReach  = exp(-radius * 0.16);
-    float highReach = exp(-radius * 0.42);
-    // Apply the reach. We keep a small floor on bass/mid (they still EXIST out
-    // wide, just attenuated) but let highs go fully local — that contrast is
-    // the whole point of "deep bends, high repels".
-    audioBass *= 0.45 + 0.55 * bassReach;
-    audioMid  *= 0.30 + 0.70 * midReach;
-    audioHigh *= highReach;
+    // ---- SPATIAL AUDIO ENERGY ---- each band's energy travels across the
+    // surface as a moving field, so a hit reads as a wavefront sweeping the
+    // water rather than the whole surface lifting at once.
+    const bassField = add(
+      0.5,
+      mul(0.5, sin(dot(vec2(0.9, 0.35), position.xy).mul(0.22).sub(u.uTime.mul(0.3))))
+    );
+    const midField = add(
+      0.5,
+      mul(0.5, sin(dot(vec2(-0.4, 0.95), position.xy).mul(0.4).add(u.uTime.mul(0.55))))
+    );
+    const highField = add(
+      0.5,
+      mul(
+        0.5,
+        sin(dot(vec2(0.6, -0.8), position.xy).mul(0.7).add(u.uTime.mul(0.95)).add(1.3))
+      )
+    );
 
-    // Wave time multipliers reduced a further ~40% (was already halved
-    // once). Even slower ocean now: big swells over ~25 seconds, chop
-    // ~10-13 seconds, ripples ~5-7 seconds.
-    //
-    // Each wave is sin(dot(D, position.xy) * F + uTime*S + phase) * Amp.
-    // We compute the phase argument ONCE, take sin() for the height and
-    // cos() for the analytic gradient (d/dx = cos(arg) * D.x * F * Amp).
-    // The gradient sum gives the surface normal for the §3 sculpted
-    // light — no dFdx/dFdy and no extra noise; just the six cosines we
-    // already have the arguments for.
-    vec2 dirBig = vec2(1.0, 0.2);   float frqBig = 0.28; float ampBig = (0.14 + audioBass * 1.3);
-    vec2 dirCrs = vec2(0.3, 1.0);   float frqCrs = 0.34; float ampCrs = (0.10 + audioBass * 0.85);
-    vec2 dirCh1 = vec2(0.7, -0.7);  float frqCh1 = 0.9;  float ampCh1 = (0.05 + audioMid * 0.9);
-    vec2 dirCh2 = vec2(-0.5, 0.85); float frqCh2 = 1.05; float ampCh2 = (0.04 + audioMid * 0.7);
-    vec2 dirRp1 = vec2(0.9, 0.4);   float frqRp1 = 2.2;  float ampRp1 = (0.025 + audioHigh * 0.35);
-    vec2 dirRp2 = vec2(-0.6, 0.8);  float frqRp2 = 2.8;  float ampRp2 = (0.02 + audioHigh * 0.25);
+    // Band energy = global level shaped by its traveling field. High floor
+    // (0.7) so a beat lifts the whole surface; field adds ~40% where it peaks.
+    const audioBass = bassEase.mul(add(0.7, bassField.mul(0.4))).toVar();
+    const audioMid = midEase.mul(add(0.7, midField.mul(0.4))).toVar();
+    const audioHigh = highEase.mul(add(0.7, highField.mul(0.4))).toVar();
 
-    // ---- ANISOTROPIC LEAN (§7.2) ----
-    // Bias each wave's spatial frequency toward the conductor heading: a
-    // wave aligned with uDir keeps its frequency (so its crests pack tight
-    // ALONG the heading), a wave across uDir is stretched (crests spread).
-    // The field "leans" the way the baton points. Crucially we mix from
-    // 1.0 (never below 1-leanAmount) so a wave perpendicular to uDir does
-    // NOT collapse to a flat DC offset — that would pop the whole plane up
-    // as the heading swept past perpendicular. leanAmount stays modest so
-    // the wavefront (§7.1), not the lean, carries most of the gesture.
-    float leanAmount = 0.32;
-    float leanBig = mix(1.0, abs(dot(normalize(dirBig), uDir)), leanAmount);
-    float leanCrs = mix(1.0, abs(dot(normalize(dirCrs), uDir)), leanAmount);
-    float leanCh1 = mix(1.0, abs(dot(normalize(dirCh1), uDir)), leanAmount);
-    float leanCh2 = mix(1.0, abs(dot(normalize(dirCh2), uDir)), leanAmount);
-    float leanRp1 = mix(1.0, abs(dot(normalize(dirRp1), uDir)), leanAmount);
-    float leanRp2 = mix(1.0, abs(dot(normalize(dirRp2), uDir)), leanAmount);
+    // ---- DIFFRACTION vs. LOCALIZATION ---- long (bass) waves diffract and
+    // reach the far field; short (high) waves stay near the source. Gate each
+    // band by a radial envelope from the origin (the sound "source").
+    const radius = length(position.xy).toVar();
+    const bassReach = exp(radius.mul(-0.045));
+    const midReach = exp(radius.mul(-0.16));
+    const highReach = exp(radius.mul(-0.42));
+    audioBass.mulAssign(add(0.45, bassReach.mul(0.55)));
+    audioMid.mulAssign(add(0.3, midReach.mul(0.7)));
+    audioHigh.mulAssign(highReach);
 
-    // The two SWELL bands (bass) propagate straight — long waves pass through
-    // obstacles rather than glancing off them. We compute their args first
-    // because their SLOPE is what the short ripples will scatter against.
-    float argBig = dot(dirBig, position.xy) * frqBig * leanBig + uTime * 0.24;
-    float argCrs = dot(dirCrs, position.xy) * frqCrs * leanCrs + uTime * 0.17 + 1.7;
+    // Wave params. Each wave: sin(dot(D, pos.xy)*F + uTime*S + phase) * Amp.
+    const dirBig = vec2(1.0, 0.2);
+    const frqBig = float(0.28);
+    const ampBig = add(0.14, audioBass.mul(1.3)).toVar();
+    const dirCrs = vec2(0.3, 1.0);
+    const frqCrs = float(0.34);
+    const ampCrs = add(0.1, audioBass.mul(0.85)).toVar();
+    const dirCh1 = vec2(0.7, -0.7);
+    const frqCh1 = float(0.9);
+    const ampCh1 = add(0.05, audioMid.mul(0.9)).toVar();
+    const dirCh2 = vec2(-0.5, 0.85);
+    const frqCh2 = float(1.05);
+    const ampCh2 = add(0.04, audioMid.mul(0.7)).toVar();
+    const dirRp1 = vec2(0.9, 0.4);
+    const frqRp1 = float(2.2);
+    const ampRp1 = add(0.025, audioHigh.mul(0.35)).toVar();
+    const dirRp2 = vec2(-0.6, 0.8);
+    const frqRp2 = float(2.8);
+    const ampRp2 = add(0.02, audioHigh.mul(0.25)).toVar();
 
-    // ---- SCATTER / REFRACTION (high waves glance off the swell) ----
-    // Short waves act like rays: when they cross a longer wave's slope they
-    // refract/deflect off it. Long waves don't — they roll straight through.
-    // We deflect each RIPPLE's heading by the in-plane SLOPE of the bass swell
-    // (the gradient of bigSwell+crossSwell), which we get for free from the
-    // analytic cosines we'd compute for the normal anyway. The deflection is
-    // perpendicular-biased (a ray bends ACROSS the gradient it climbs), scaled
-    // by how loud the high band is, so ripples only skitter and break up on a
-    // real high hit and run clean when the highs are quiet. Mid chop deflects a
-    // little (half), bass not at all — that gradient of "bends more / repels
-    // more" down the spectrum is the law you described.
-    vec2 swellSlope =
-      cos(argBig) * dirBig * frqBig * leanBig * ampBig +
-      cos(argCrs) * dirCrs * frqCrs * leanCrs * ampCrs;
-    // Rotate the slope 90° to get the deflection axis (rays bend across, not
-    // along, the slope), and gate by the high energy so it's audio-driven.
-    vec2 deflect = vec2(-swellSlope.y, swellSlope.x);
-    vec2 dirRp1d = normalize(dirRp1 + deflect * (3.2 * audioHigh));
-    vec2 dirRp2d = normalize(dirRp2 + deflect * (3.8 * audioHigh));
-    // Mid chop scatters a touch (between bass-straight and high-skitter).
-    vec2 dirCh1d = normalize(dirCh1 + deflect * (1.1 * audioMid));
-    vec2 dirCh2d = normalize(dirCh2 + deflect * (1.3 * audioMid));
+    // ---- ANISOTROPIC LEAN ---- bias each wave's frequency toward the
+    // conductor heading; mix from 1.0 so a perpendicular wave doesn't collapse
+    // to a flat DC offset.
+    const leanAmount = float(0.32);
+    const lean = (d: Node<"vec2">) =>
+      tslMix(float(1.0), abs(dot(normalize(d), u.uDir)), leanAmount);
+    const leanBig = lean(dirBig).toVar();
+    const leanCrs = lean(dirCrs).toVar();
+    const leanCh1 = lean(dirCh1).toVar();
+    const leanCh2 = lean(dirCh2).toVar();
+    const leanRp1 = lean(dirRp1).toVar();
+    const leanRp2 = lean(dirRp2).toVar();
 
-    // Recompute the chop/ripple args off their DEFLECTED headings.
-    float argCh1s = dot(dirCh1d, position.xy) * frqCh1 * leanCh1 + uTime * 0.42 + 0.5;
-    float argCh2s = dot(dirCh2d, position.xy) * frqCh2 * leanCh2 + uTime * 0.51 + 3.0;
-    float argRp1 = dot(dirRp1d, position.xy) * frqRp1 * leanRp1 + uTime * 0.87;
-    float argRp2 = dot(dirRp2d, position.xy) * frqRp2 * leanRp2 + uTime * 0.99 + 2.2;
+    // The two SWELL bands (bass) propagate straight — long waves pass through.
+    const argBig = dot(dirBig, position.xy).mul(frqBig).mul(leanBig).add(u.uTime.mul(0.24)).toVar();
+    const argCrs = dot(dirCrs, position.xy).mul(frqCrs).mul(leanCrs).add(u.uTime.mul(0.17)).add(1.7).toVar();
 
-    float bigSwell  = sin(argBig) * ampBig;
-    float crossSwell = sin(argCrs) * ampCrs;
-    float chop1     = sin(argCh1s) * ampCh1;
-    float chop2     = sin(argCh2s) * ampCh2;
-    float ripple1   = sin(argRp1) * ampRp1;
-    float ripple2   = sin(argRp2) * ampRp2;
+    // ---- SCATTER / REFRACTION ---- short waves glance off the swell's slope;
+    // long waves don't. Deflect each ripple's heading by the bass-swell
+    // gradient (perpendicular-biased), gated by the high energy.
+    const swellSlope = cos(argBig)
+      .mul(dirBig)
+      .mul(frqBig)
+      .mul(leanBig)
+      .mul(ampBig)
+      .add(cos(argCrs).mul(dirCrs).mul(frqCrs).mul(leanCrs).mul(ampCrs))
+      .toVar();
+    const deflect = vec2(swellSlope.y.negate(), swellSlope.x);
+    const dirRp1d = normalize(dirRp1.add(deflect.mul(audioHigh.mul(3.2)))).toVar();
+    const dirRp2d = normalize(dirRp2.add(deflect.mul(audioHigh.mul(3.8)))).toVar();
+    const dirCh1d = normalize(dirCh1.add(deflect.mul(audioMid.mul(1.1)))).toVar();
+    const dirCh2d = normalize(dirCh2.add(deflect.mul(audioMid.mul(1.3)))).toVar();
 
-    // ---- RADIAL BEAT PULSE ----
-    // On a bass hit, a ring expands outward from the origin (the sound
-    // "source"). uPulse is a 0->1 envelope retriggered on each beat in
-    // JS; here it drives a sine ring whose radius grows as the envelope
-    // decays, so the crest sweeps outward and fades. This is the most
-    // literal "spatial wave" — a disturbance with an epicenter that
-    // propagates. Damped by distance so it dies out toward the horizon.
-    // (radius is computed up top, alongside the diffraction envelopes.)
-    float ringPhase = radius * 1.1 - uPulse * 9.0;       // crest travels out as pulse rises
-    float ringEnv = uPulse * (1.0 - uPulse);             // 0 at rest & full, peaks mid-pulse
-    float radialPulse =
-      sin(ringPhase) *
-      exp(-radius * 0.18) *                              // distance damping
-      ringEnv * 1.6;
+    // Recompute chop/ripple args off the DEFLECTED headings.
+    const argCh1s = dot(dirCh1d, position.xy).mul(frqCh1).mul(leanCh1).add(u.uTime.mul(0.42)).add(0.5).toVar();
+    const argCh2s = dot(dirCh2d, position.xy).mul(frqCh2).mul(leanCh2).add(u.uTime.mul(0.51)).add(3.0).toVar();
+    const argRp1 = dot(dirRp1d, position.xy).mul(frqRp1).mul(leanRp1).add(u.uTime.mul(0.87)).toVar();
+    const argRp2 = dot(dirRp2d, position.xy).mul(frqRp2).mul(leanRp2).add(u.uTime.mul(0.99)).add(2.2).toVar();
 
-    // ---- TRAVELING WAVEFRONT (§7.1) ----
-    // A single swell band whose crest sweeps ALONG the conductor heading.
-    // d is the distance of this vertex along uDir; the crest position is
-    // d*frontFreq - frontSpeed*uTime, so as time advances the crest moves
-    // up-heading — and as uDir turns (§6) the whole swell pivots to sweep
-    // the new way. env(d) is a Gaussian centered on the plane so it stays
-    // a BAND travelling through the middle, not a full-plane lift. Energy
-    // is the music's body (bass+mid) so the gesture only swells with the
-    // audio and rests flat when idle — the §6 heading still drifts so it's
-    // never frozen, but the visible swell is audio-gated.
-    float d = dot(uDir, position.xy);
-    float frontEnergy = audioBass * 0.7 + audioMid * 0.5;
-    float frontPhase = d * 0.55 - uTime * 1.6;
-    float wavefront = sin(frontPhase) * exp(-d * d * 0.018) * frontEnergy;
+    const bigSwell = sin(argBig).mul(ampBig);
+    const crossSwell = sin(argCrs).mul(ampCrs);
+    const chop1 = sin(argCh1s).mul(ampCh1);
+    const chop2 = sin(argCh2s).mul(ampCh2);
+    const ripple1 = sin(argRp1).mul(ampRp1);
+    const ripple2 = sin(argRp2).mul(ampRp2);
 
-    // Per-layer weights into the summed height. The gradient below MUST
-    // use these same weights so the normal matches the surface we draw.
-    float wBig = 0.85, wCrs = 0.55, wCh1 = 0.18, wCh2 = 0.14, wRp1 = 1.0, wRp2 = 1.0;
+    // ---- RADIAL BEAT PULSE ---- a ring expands from the origin on a hit.
+    const ringPhase = radius.mul(1.1).sub(u.uPulse.mul(9.0));
+    const ringEnv = u.uPulse.mul(oneMinus(u.uPulse));
+    const radialPulse = sin(ringPhase).mul(exp(radius.mul(-0.18))).mul(ringEnv).mul(1.6);
 
-    // Sum the wave layers.
-    float waveSum =
-      bigSwell * wBig +
-      crossSwell * wCrs +
-      chop1 * wCh1 +
-      chop2 * wCh2 +
-      ripple1 * wRp1 +
-      ripple2 * wRp2 +
-      wavefront * 1.1 +
-      radialPulse;
+    // ---- TRAVELING WAVEFRONT ---- a swell band whose crest sweeps ALONG the
+    // conductor heading; a Gaussian band centred on the plane. Audio-gated.
+    const d = dot(u.uDir, position.xy).toVar();
+    const frontEnergy = audioBass.mul(0.7).add(audioMid.mul(0.5));
+    const frontPhase = d.mul(0.55).sub(u.uTime.mul(1.6));
+    const wavefront = sin(frontPhase).mul(exp(d.mul(d).mul(-0.018))).mul(frontEnergy);
 
-    // ---- ANALYTIC SURFACE NORMAL (§3) ----
-    // Gradient of the height field in local x/y. For each wave term
-    // sin(arg)*amp, d/dx = cos(arg) * dirX * freq * amp (chain rule).
-    // We sum the same six terms with the same weights as the height.
-    // The radial pulse and fbm texture are intentionally omitted: the
-    // pulse is near-zero except mid-beat, and snoise has no cheap
-    // analytic gradient — both contribute < 15% of the slope and would
-    // only cost an extra noise eval. The surface light reads fine
-    // without them.
-    // (frequency factors include the §7.2 lean so the normal matches the
-    // leaned surface — lean is constant in x/y so it passes through the
-    // chain rule as a plain multiplier. The chop/ripple terms use their
-    // DEFLECTED headings + args so the normal matches the scattered surface;
-    // like lean, the deflection direction is treated as locally constant — its
-    // own spatial variation is a small high-order term we drop, same trade the
-    // lean simplification already makes.)
-    float dHdx =
-      cos(argBig) * dirBig.x * frqBig * leanBig * ampBig * wBig +
-      cos(argCrs) * dirCrs.x * frqCrs * leanCrs * ampCrs * wCrs +
-      cos(argCh1s) * dirCh1d.x * frqCh1 * leanCh1 * ampCh1 * wCh1 +
-      cos(argCh2s) * dirCh2d.x * frqCh2 * leanCh2 * ampCh2 * wCh2 +
-      cos(argRp1) * dirRp1d.x * frqRp1 * leanRp1 * ampRp1 * wRp1 +
-      cos(argRp2) * dirRp2d.x * frqRp2 * leanRp2 * ampRp2 * wRp2;
-    float dHdy =
-      cos(argBig) * dirBig.y * frqBig * leanBig * ampBig * wBig +
-      cos(argCrs) * dirCrs.y * frqCrs * leanCrs * ampCrs * wCrs +
-      cos(argCh1s) * dirCh1d.y * frqCh1 * leanCh1 * ampCh1 * wCh1 +
-      cos(argCh2s) * dirCh2d.y * frqCh2 * leanCh2 * ampCh2 * wCh2 +
-      cos(argRp1) * dirRp1d.y * frqRp1 * leanRp1 * ampRp1 * wRp1 +
-      cos(argRp2) * dirRp2d.y * frqRp2 * leanRp2 * ampRp2 * wRp2;
-    // Local-space normal: surface is z = H(x,y), so the (unnormalized)
-    // normal is (-dHdx, -dHdy, 1). normalMatrix carries it to world
-    // space (mesh has uniform scale, so this is exact).
-    vec3 localNormal = normalize(vec3(-dHdx, -dHdy, 1.0));
-    vNormal = normalize(normalMatrix * localNormal);
+    // Per-layer weights into the summed height. The gradient below uses the
+    // SAME weights so the normal matches the surface we draw.
+    const wBig = 0.85, wCrs = 0.55, wCh1 = 0.18, wCh2 = 0.14, wRp1 = 1.0, wRp2 = 1.0;
 
-    // Water texture — soft broad FBM noise on top of the sines.
-    float texture = fbm(position.xy * 0.35, uTime * 0.13) * 0.06;
+    const waveSum = bigSwell
+      .mul(wBig)
+      .add(crossSwell.mul(wCrs))
+      .add(chop1.mul(wCh1))
+      .add(chop2.mul(wCh2))
+      .add(ripple1.mul(wRp1))
+      .add(ripple2.mul(wRp2))
+      .add(wavefront.mul(1.1))
+      .add(radialPulse);
 
-    float displaced = waveSum + texture;
+    // ---- ANALYTIC SURFACE NORMAL ---- gradient of the height field. For each
+    // wave sin(arg)*amp, d/dx = cos(arg)*dirX*freq*amp. Same six terms, same
+    // weights as the height. The pulse + fbm texture are omitted (< 15% of the
+    // slope, and snoise has no cheap analytic gradient).
+    const dHdx = cos(argBig).mul(dirBig.x).mul(frqBig).mul(leanBig).mul(ampBig).mul(wBig)
+      .add(cos(argCrs).mul(dirCrs.x).mul(frqCrs).mul(leanCrs).mul(ampCrs).mul(wCrs))
+      .add(cos(argCh1s).mul(dirCh1d.x).mul(frqCh1).mul(leanCh1).mul(ampCh1).mul(wCh1))
+      .add(cos(argCh2s).mul(dirCh2d.x).mul(frqCh2).mul(leanCh2).mul(ampCh2).mul(wCh2))
+      .add(cos(argRp1).mul(dirRp1d.x).mul(frqRp1).mul(leanRp1).mul(ampRp1).mul(wRp1))
+      .add(cos(argRp2).mul(dirRp2d.x).mul(frqRp2).mul(leanRp2).mul(ampRp2).mul(wRp2));
+    const dHdy = cos(argBig).mul(dirBig.y).mul(frqBig).mul(leanBig).mul(ampBig).mul(wBig)
+      .add(cos(argCrs).mul(dirCrs.y).mul(frqCrs).mul(leanCrs).mul(ampCrs).mul(wCrs))
+      .add(cos(argCh1s).mul(dirCh1d.y).mul(frqCh1).mul(leanCh1).mul(ampCh1).mul(wCh1))
+      .add(cos(argCh2s).mul(dirCh2d.y).mul(frqCh2).mul(leanCh2).mul(ampCh2).mul(wCh2))
+      .add(cos(argRp1).mul(dirRp1d.y).mul(frqRp1).mul(leanRp1).mul(ampRp1).mul(wRp1))
+      .add(cos(argRp2).mul(dirRp2d.y).mul(frqRp2).mul(leanRp2).mul(ampRp2).mul(wRp2));
+    // Local normal: surface is z = H(x,y) → (-dHdx, -dHdy, 1). modelNormalMatrix
+    // carries it to world space (uniform scale, so exact).
+    const localNormal = normalize(vec3(dHdx.negate(), dHdy.negate(), 1.0));
+    vNormal.assign(normalize(modelNormalMatrix.mul(localNormal)));
 
-    vec3 newPos = vec3(position.x, position.y, displaced);
+    // Water texture — soft broad FBM on top of the sines.
+    const texture = fbm(position.xy.mul(0.35), u.uTime.mul(0.13)).mul(0.06);
+    const displaced = waveSum.add(texture).toVar();
 
-    // Compute world position for the fragment shader's contour math.
-    vec4 worldPos = modelMatrix * vec4(newPos, 1.0);
-    vWorldPos = worldPos.xyz;
-    vWorldY = worldPos.y;
-    // Normalize wave height to 0..1 for surface shading. The summed
-    // wave displacement is roughly -2..+2 wu; remap to 0..1 so wave
-    // crests=1, troughs=0.
-    vHeightNorm = clamp(displaced * 0.25 + 0.5, 0.0, 1.0);
+    const newPos = vec3(position.x, position.y, displaced);
+    const worldPos = modelWorldMatrix.mul(vec4(newPos, 1.0));
+    vWorldPos.assign(worldPos.xyz);
+    vWorldY.assign(worldPos.y);
+    // Normalize wave height to 0..1 (crests=1, troughs=0).
+    vHeightNorm.assign(clamp(displaced.mul(0.25).add(0.5), 0.0, 1.0));
+    vCameraDist.assign(length(cameraPosition.sub(worldPos.xyz)));
 
-    // Camera distance for atmospheric depth fade.
-    vCameraDist = length(cameraPosition - worldPos.xyz);
+    return newPos;
+  });
+}
 
-    gl_Position = projectionMatrix * viewMatrix * worldPos;
-  }
-`;
+/**
+ * Fragment colour — contour lines + sculpted surface fill + horizon glow +
+ * haze, reading the varyings above. Mirrors the original fragment main().
+ */
+function buildColorNode(u: Uniforms) {
+  return Fn(() => {
+    // Contour spacing — bass tightens it (lines crowd on beats), clamped so it
+    // can't collapse below 30% of base.
+    const baseSpacing = float(0.04);
+    const spacing = baseSpacing.mul(oneMinus(clamp(u.uBass.mul(1.4), 0.0, 0.55)));
+    const ratio = vWorldY.div(spacing).toVar();
+    const distNorm = abs(fract(ratio).sub(0.5));
 
-const fragmentShader = /* glsl */ `
-  precision highp float;
-  varying float vWorldY;
-  varying vec3 vWorldPos;
-  varying float vCameraDist;
-  varying float vHeightNorm;
-  varying vec3 vNormal;
-  uniform float uBass;
-  uniform float uHigh;
-  uniform float uTheme;   // 0 = dark, 1 = light (eased in JS)
-  uniform vec3 uFogColor; // horizon haze tint — matches the atmosphere bed so terrain dissolves into it (§2)
+    // ---- ATMOSPHERIC DEPTH ---- nearFade trims the foreground; haze is an
+    // exponential extinction toward the far plane so land DISSOLVES into the
+    // horizon rather than hard-cutting.
+    const nearFade = smoothstep(1.5, 3.5, vCameraDist);
+    const haze = exp(max(vCameraDist.sub(3.5), 0.0).mul(-0.34));
+    const hazeAmt = oneMinus(haze);
+    const depthFade = nearFade.mul(haze).toVar();
 
-  void main() {
-    // Contour spacing. Bass tightens spacing dramatically — lines
-    // visibly crowd into denser bands on beats. The clamp prevents
-    // spacing from collapsing below 30% of the base so peaks don't
-    // become a solid wash.
-    float baseSpacing = 0.04;
-    float spacing = baseSpacing * (1.0 - clamp(uBass * 1.4, 0.0, 0.55));
+    // Pixel-stable line width via screen-space derivatives.
+    const widthScale = tslMix(float(0.95), float(0.45), depthFade);
+    const w = fwidth(ratio).mul(widthScale).mul(oneMinus(u.uHigh.mul(0.3))).toVar();
+    const line = oneMinus(smoothstep(w.mul(0.5), w, distNorm)).toVar();
 
-    // Standard contour math.
-    float ratio = vWorldY / spacing;
-    float distNorm = abs(fract(ratio) - 0.5);
+    // Per-line opacity jitter so density visibly varies.
+    const lineId = floor(ratio);
+    const lineJitter = add(0.55, mul(0.45, fract(sin(lineId.mul(12.9898)).mul(43758.5453))));
+    line.mulAssign(lineJitter);
+    line.mulAssign(depthFade);
 
-    // ---- ATMOSPHERIC DEPTH (§2) ----
-    // Two-part falloff instead of one flat smoothstep band:
-    //   1. nearFade — a soft ramp that just trims the very foreground so
-    //      the closest lip doesn't over-bloom; full strength by ~3.5wu.
-    //   2. haze — an EXPONENTIAL extinction toward the far plane, so the
-    //      land doesn't end at a hard cutoff but DISSOLVES into a defined
-    //      horizon (the "emerging from haze" read). exp(-d*k) never quite
-    //      reaches 0, so distant ridges leave a faint glow in the mist
-    //      rather than snapping to black.
-    // depthFade is the line/surface coverage multiplier (keeps the old
-    // name so the contour + fill math below is unchanged); hazeAmt is the
-    // 0..1 "how much fog" used later to blend the colour toward uFogColor.
-    float nearFade = smoothstep(1.5, 3.5, vCameraDist);
-    float haze = exp(-max(vCameraDist - 3.5, 0.0) * 0.34);   // 1 near, ~0.1 by ~10wu
-    float hazeAmt = 1.0 - haze;
-    float depthFade = nearFade * haze;
+    // Right-side mask, softened — lines bleed leftward at 25% so the wordmark
+    // reads against a faint continuation, not a hard cutoff.
+    const rightMask = tslMix(float(0.25), float(1.0), smoothstep(-2.5, 2.5, vWorldPos.x));
+    line.mulAssign(rightMask);
 
-    // Pixel-stable line width via screen-space derivatives. Near lines
-    // crisp, far lines softer.
-    float widthScale = mix(0.95, 0.45, depthFade);
-    float w = fwidth(ratio) * widthScale;
-    w *= 1.0 - uHigh * 0.3;
-    float line = 1.0 - smoothstep(w * 0.5, w, distNorm);
+    // ---- SURFACE FILL + SCULPTED LIGHT ---- faint fill between lines; a low
+    // cold key light off the analytic normal lifts ridges that face it.
+    const surfaceShade = vHeightNorm.mul(0.2).add(0.03).toVar();
+    const keyDir = normalize(vec3(-0.55, 0.4, 0.35));
+    const key = max(dot(normalize(vNormal), keyDir), 0.0);
+    const ridgeLight = key.mul(smoothstep(0.45, 0.95, vHeightNorm)).toVar();
+    surfaceShade.addAssign(ridgeLight.mul(0.16).mul(oneMinus(u.uTheme))); // dark-mode sculpt
+    surfaceShade.mulAssign(depthFade);
+    surfaceShade.mulAssign(rightMask);
+    const surfaceBase = vec3(0.14, 0.17, 0.23);
+    const surfaceLit = vec3(0.3, 0.4, 0.52);
+    const surfaceTint = tslMix(
+      surfaceBase,
+      surfaceLit,
+      clamp(ridgeLight, 0.0, 1.0).mul(oneMinus(u.uTheme))
+    );
+    const surfaceAlpha = surfaceShade.mul(oneMinus(u.uTheme.mul(0.92)));
 
-    // Per-line opacity jitter — each contour level gets a brightness
-    // factor so density visibly varies.
-    float lineId = floor(ratio);
-    float lineJitter = 0.55 + 0.45 * fract(sin(lineId * 12.9898) * 43758.5453);
-    line *= lineJitter;
-    line *= depthFade;
+    // ---- LINE COLOR ---- dark: cold white-blue, amber bleeds into lit crests
+    // on a beat. Light: drawn-ink with a faint warm beat tint.
+    const cool = vec3(0.889, 0.894, 0.902);
+    const amber = vec3(0.722, 0.518, 0.361);
+    const warmGrey = vec3(0.6, 0.56, 0.51);
+    const inkLine = vec3(0.07, 0.065, 0.058);
 
-    // Right-side mask, softened. Previously cut lines to 0 on the far
-    // left; the hero now sits IN FRONT of faint waves rather than
-    // beside them, so lines bleed leftward at ~25% opacity. Far right
-    // is still full strength; far left floors at 0.25 so the wordmark
-    // reads against a faint continuation of the wave field, not a
-    // hard cutoff. Surface fill still uses the same mask, so the
-    // mesh shading dims in lockstep.
-    float rightMask = mix(0.25, 1.0, smoothstep(-2.5, 2.5, vWorldPos.x));
-    line *= rightMask;
+    const beat = smoothstep(0.32, 0.7, u.uBass);
+    const crest = smoothstep(0.48, 0.92, vHeightNorm);
+    const amberMix = beat.mul(crest).mul(0.85);
+    const darkLine = tslMix(cool, amber, amberMix);
 
-    // ---- SURFACE FILL + SCULPTED LIGHT (§3) ----
-    // The mesh between contour lines draws as a faint fill. Base term is
-    // still height (peaks brighter than valleys) so the form reads even
-    // on flats; on TOP we add a low, cold KEY light off the analytic
-    // normal so ridges that FACE the light lift and faces turned away
-    // fall to black. That's what turns the gradient into sculpted land.
-    float surfaceShade = vHeightNorm * 0.20 + 0.03;  // base height fill (slightly lower so the light has headroom)
+    const warmMix = smoothstep(0.5, 0.8, u.uBass);
+    const lightLine = tslMix(inkLine, warmGrey, warmMix.mul(0.7));
+    const lineColor = tslMix(darkLine, lightLine, u.uTheme).toVar();
 
-    // Low cold key: from the left, just above the horizon. Diffuse only;
-    // no specular (this is matte land, not water-sheen). The light is a
-    // dark-mode device — paper mode wants clean fill, so we gate it out.
-    vec3 keyDir = normalize(vec3(-0.55, 0.40, 0.35));
-    float key = max(dot(normalize(vNormal), keyDir), 0.0);
-    // Gate the key to the high parts of the surface (vHeightNorm) so it
-    // sculpts RIDGES rather than lifting the whole field — and clamp it,
-    // so only genuine lit crests can approach the bloom threshold while
-    // the inter-line fill stays well below it (guards the OLED bed).
-    float ridgeLight = key * smoothstep(0.45, 0.95, vHeightNorm);
-    surfaceShade += ridgeLight * 0.16 * (1.0 - uTheme);   // dark-mode sculpt only
-    surfaceShade *= depthFade;
-    surfaceShade *= rightMask;
-    // Surface fill between the lines. Dark mode: a faint cool tint that
-    // makes the 3D form readable on black, lifted toward a colder blue on
-    // lit ridges (the key's colour). Light mode: we DROP this almost
-    // entirely so clean paper shows between the lines — a grey fill there
-    // just washes the contrast out and buries the lines. Fade it to ~0 as
-    // uTheme→1.
-    vec3 surfaceBase = vec3(0.14, 0.17, 0.23);   // ambient fill colour
-    vec3 surfaceLit  = vec3(0.30, 0.40, 0.52);   // cold-blue lift where the key catches a ridge
-    vec3 surfaceTint = mix(surfaceBase, surfaceLit, clamp(ridgeLight, 0.0, 1.0) * (1.0 - uTheme));
-    float surfaceAlpha = surfaceShade * (1.0 - uTheme * 0.92);
+    // ---- HORIZON LUMINANCE GRADIENT ---- contours toward the horizon glow
+    // brighter so the land reads as emerging luminous from haze. Dark only.
+    const horizonGlow = tslMix(float(1.0), float(1.85), smoothstep(3.0, 9.0, vCameraDist));
+    lineColor.mulAssign(tslMix(horizonGlow, float(1.0), u.uTheme));
 
-    // ---- LINE COLOR ----
-    // Dark mode: cold white-blue. On a beat, the site's ONE accent —
-    // amber #b8845c — bleeds into the HIGH PARTS OF THE CREST only, so a
-    // hit sends amber glow rippling along the ridgelines (the landscape
-    // itself reacting) rather than warming every line into a flat wash.
-    // That's both the DS "luminous terrain" note and the on-brand accent
-    // rule (amber = shader peaks) in one move (§4). Light mode keeps its
-    // restrained drawn-ink behaviour with a faint warm beat-tint.
-    vec3 cool = vec3(0.889, 0.894, 0.902);   // #e3e4e6 — near-neutral, faintest cool
-    vec3 amber = vec3(0.722, 0.518, 0.361);  // #b8845c — the sanctioned warm accent (shader peaks)
-    vec3 warmGrey = vec3(0.600, 0.560, 0.510); // #998f82 — desaturated, for the paper bed
-    vec3 inkLine = vec3(0.07, 0.065, 0.058); // near-black neutral ink for light
+    // Line alpha — dark lifted to 1.35×, light ~2.8×.
+    const lineAlpha = line.mul(tslMix(float(1.35), float(2.8), u.uTheme));
 
-    // Amber gate (dark mode): a loud beat × a high crest. Both factors are
-    // 0..1, so amber only appears where a tall ridge coincides with a hit
-    // and fades back to cool as either subsides — it RIPPLES along the
-    // crests as the waves move, instead of tinting the whole field. The
-    // crest gate opens from 0.48 so the amber catches the upper SHOULDERS
-    // of ridges (reads as a glow running along the ridgeline) not just the
-    // single tallest pixels; capped below 1.0 so the brightest crests keep
-    // a cool core and the amber stays an accent, never a flat wash.
-    float beat = smoothstep(0.32, 0.7, uBass);
-    float crest = smoothstep(0.48, 0.92, vHeightNorm);
-    float amberMix = beat * crest * 0.85;
-    vec3 darkLine = mix(cool, amber, amberMix);
+    // Composite line over surface fill as proper coverage.
+    const finalAlpha = max(surfaceAlpha, lineAlpha).toVar();
+    const lineFrac = finalAlpha.greaterThan(0.0001).select(lineAlpha.div(finalAlpha), float(0.0));
+    const finalColor = tslMix(surfaceTint, lineColor, lineFrac).toVar();
 
-    // Light mode: keep the prior subtle warm-grey beat tint (global, faint).
-    float warmMix = smoothstep(0.5, 0.8, uBass);
-    vec3 lightLine = mix(inkLine, warmGrey, warmMix * 0.7);
-    vec3 lineColor = mix(darkLine, lightLine, uTheme);
+    // Pull the colour toward the horizon haze tint with distance so far
+    // terrain meets the background seamlessly.
+    finalColor.assign(tslMix(finalColor, u.uFogColor, hazeAmt));
 
-    // ---- HORIZON LUMINANCE GRADIENT (§1) ----
-    // The single highest-impact DS move: contours toward the horizon glow
-    // BRIGHTER than the calm foreground, so the land reads as "emerging
-    // luminous from haze" rather than as flat lines on flat black. Drive
-    // off camera distance — a smooth lift that peaks in the mid-distance
-    // band, just before §2's haze swallows the far ridges. Dark mode only;
-    // on paper the ink should stay an even weight, not glow.
-    float horizonGlow = mix(1.0, 1.85, smoothstep(3.0, 9.0, vCameraDist));
-    lineColor *= mix(horizonGlow, 1.0, uTheme);
-
-    // Line alpha. Dark mode lifted to 1.35× so the contours are clearly
-    // the brightest thing on the OLED-black bed (the instrument reads as a
-    // live signal, not faint corner lines). Light mode stays ~2.8× so the
-    // field reads as drawn ink on paper rather than washing out.
-    float lineAlpha = line * mix(1.35, 2.8, uTheme);
-
-    // Composite as proper (non-premultiplied) source colour + coverage.
-    // The fragment alpha-blends over the atmosphere's background, so the
-    // RGB we output must be the un-weighted colour (the blender applies
-    // src.a). Lines sit over the surface fill: pick the line colour where
-    // it covers, else the surface tint. This matters on the light paper
-    // bed where the destination is bright (the old additive form only
-    // looked right because dark-mode dst was black).
-    float finalAlpha = max(surfaceAlpha, lineAlpha);
-    float lineFrac = finalAlpha > 0.0001 ? lineAlpha / finalAlpha : 0.0;
-    // Both surfaceTint and lineColor are plain (un-premultiplied) colours;
-    // pick line where it covers, surface tint elsewhere.
-    vec3 finalColor = mix(surfaceTint, lineColor, lineFrac);
-
-    // §2 — pull the colour toward the horizon haze tint with distance, so
-    // far terrain meets the background seamlessly (a defined horizon)
-    // rather than floating as dimmed lines on the bed. uFogColor matches
-    // the atmosphere's bed colour (OLED black in dark, paper in light), so
-    // terrain and background converge to the same value at the far plane.
-    finalColor = mix(finalColor, uFogColor, hazeAmt);
-
-    if (finalAlpha < 0.005) discard;
-    gl_FragColor = vec4(finalColor, finalAlpha);
-  }
-`;
+    Discard(finalAlpha.lessThan(0.005));
+    return vec4(finalColor, finalAlpha);
+  });
+}
 
 export function Terrain() {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const matRef = useRef<THREE.ShaderMaterial>(null);
   const levels = useAudioLevels();
-  const { theme } = useTheme();
-  // Eased 0..1 theme mix the shader reads; lerps toward the target so the
-  // background morphs in sync with the CSS @property token transition
-  // rather than snapping (the moneypower pattern).
-  const themeMix = useRef(0);
 
-  const { geometry, uniforms } = useMemo(() => {
-    const geo = new THREE.PlaneGeometry(
+  // Material/geometry/uniforms are mutable GPU state written every frame, so
+  // they live in a lazily-initialised ref (not useMemo) — the externally-
+  // mutable store the per-frame uniform writes belong to.
+  const store = useRef<{
+    material: MeshBasicNodeMaterial;
+    geometry: THREE.PlaneGeometry;
+    uniforms: Uniforms;
+  } | null>(null);
+  if (store.current === null) {
+    const geometry = new THREE.PlaneGeometry(
       PLANE_SIZE,
       PLANE_SIZE,
       SEGMENTS,
       SEGMENTS
     );
-    const u = {
-      uTime: { value: 0 },
-      uBass: { value: 0 },
-      uMid: { value: 0 },
-      uHigh: { value: 0 },
-      uPulse: { value: 0 },
-      uTheme: { value: 0 },
-      // Horizon haze tint (§2). Lerped per-theme in useFrame to match the
-      // atmosphere bed so terrain dissolves into the background, not black.
-      uFogColor: { value: new THREE.Color(0, 0, 0) },
-      // Auto-conductor heading (§6) — a unit vec2 swept by an LFO in
-      // useFrame. Starts pointing along +x.
-      uDir: { value: new THREE.Vector2(1, 0) },
-    };
-    return { geometry: geo, uniforms: u };
-  }, []);
+    const uniforms = makeUniforms();
+    const material = new MeshBasicNodeMaterial();
+    material.positionNode = buildVertexNode(uniforms)();
+    material.colorNode = buildColorNode(uniforms)();
+    material.transparent = true;
+    material.depthWrite = false;
+    material.side = THREE.FrontSide;
+    store.current = { material, geometry, uniforms };
+  }
+  const { material, geometry, uniforms } = store.current;
 
-  // Free GPU resources on unmount (tier/reduced-motion skips, future code
-  // splits). The geometry is the memoized instance; the ShaderMaterial is the
-  // one r3f builds from the <shaderMaterial> tag, reachable via matRef.
+  // Shared eased theme transition (0 dark / 1 light); written into uTheme + the
+  // fog colour in the useFrame below.
+  const themeMix = useThemeMix();
+
+  // Free GPU resources on unmount.
   useEffect(() => {
     return () => {
       geometry.dispose();
-      matRef.current?.dispose();
+      material.dispose();
     };
-  }, [geometry]);
+  }, [geometry, material]);
 
-  // Dev guard: warn on any uniform declared here but never read by a shader
-  // stage (the uScroll/uColor bug class). No-op in production.
-  useEffect(() => {
-    assertUniformsUsed("terrain", uniforms, vertexShader, fragmentShader);
-  }, [uniforms]);
-
-  // Radial beat pulse state. We detect a bass ONSET (this frame's bass
-  // jumped well above last frame's) and, when not already mid-pulse,
-  // launch a 0->1 ramp. The ramp drives uPulse, which the shader turns
-  // into an expanding ring. prevBass tracks the previous frame's level
-  // for onset detection; pulse is the live envelope value.
+  // ---- per-frame audio + conductor + pulse state ----
   const prevBass = useRef(0);
   const pulse = useRef(0);
   const pulseActive = useRef(false);
-
-  // Eased band amplitudes for the WAVE FIELD and contours. The shared
-  // audio levels have a deliberately snappy attack (good for the beat
-  // glow and the radial-pulse onset, which want the raw transient), but
-  // feeding them straight into wave height made the surface surge and
-  // collapse in a single frame. These refs are a slower one-pole over
-  // those levels — separate attack vs. release so energy swells in over
-  // a few frames and ebbs out gently, like real water gaining/losing a
-  // swell rather than snapping to it. Used ONLY for the uniforms; the
-  // onset detector below still reads the raw level.
   const ampBass = useRef(0);
   const ampMid = useRef(0);
   const ampHigh = useRef(0);
-
-  // ---- AUTO-CONDUCTOR STATE (§6) ----
-  // The baton. `phase` is accumulated by rate*delta each frame (NOT
-  // t*rate, so a change in rate bends the sweep smoothly instead of
-  // jumping it). `dir` is the eased heading the shader reads; we lerp it
-  // toward the LFO target and renormalize so dot(uDir, pos) stays a true
-  // projected distance even mid-turn.
   const condPhase = useRef(0);
   const condDir = useRef(new THREE.Vector2(1, 0));
-
-  // Last pulse counter we acted on. The console buttons increment
-  // levels.current.pulse via triggerPulse(); when this lags that, fire a
-  // manual ripple (see useFrame). Lets a click "pluck" the surface when
-  // no audio is driving it.
   const seenPulse = useRef(0);
 
   useFrame(({ clock }, delta) => {
-    const mat = matRef.current;
-    if (!mat) return;
-    const u = mat.uniforms;
+    const u = uniforms;
     u.uTime.value = clock.elapsedTime;
-
-    // Ease theme mix toward target (0 dark / 1 light). 0.08/frame ≈ a
-    // ~450ms settle at 60fps, matching the CSS token transition.
-    const themeTarget = theme === "light" ? 1 : 0;
-    themeMix.current += (themeTarget - themeMix.current) * 0.08;
     u.uTheme.value = themeMix.current;
 
-    // Horizon haze tint follows the eased theme between the atmosphere's
-    // dark bed (#000) and its paper bed (#f2f1ef ≈ 0.949,0.945,0.937), so
-    // far terrain dissolves into whatever the background actually is.
-    const fog = u.uFogColor.value as THREE.Color;
+    // Horizon haze tint follows the eased theme between the atmosphere's dark
+    // bed (#000) and paper bed (≈0.949,0.945,0.937) so terrain dissolves into
+    // whatever the background actually is. themeMix is the shared eased ref.
     const m = themeMix.current;
-    fog.setRGB(0.949 * m, 0.945 * m, 0.937 * m);
+    u.uFogColor.value.setRGB(0.949 * m, 0.945 * m, 0.937 * m);
 
-    // Ease the band amplitudes toward the live levels. Asymmetric and
-    // attack-heavy: the wave reacts fast on the way UP (so it tracks the
-    // beat without feeling laggy) but releases slowly on the way DOWN,
-    // so it swells with the hit and then ebbs out smoothly instead of
-    // snapping to zero. Earlier values smoothed the attack too — that
-    // read as lag. The fade was never the problem; only the surge was.
+    // Ease band amplitudes toward live levels — attack-heavy (tracks the beat)
+    // but slow release (ebbs out like real water) so the surface swells with a
+    // hit instead of snapping.
     const AMP_ATTACK = 0.4;
     const AMP_RELEASE = 0.05;
     const ease = (cur: number, target: number) =>
@@ -627,23 +459,15 @@ export function Terrain() {
     u.uMid.value = ampMid.current;
     u.uHigh.value = ampHigh.current;
 
-    // ---- AUTO-CONDUCTOR LFO (§6) ----
-    // The baton sweeps the heading left<->right on its own, so the scene
-    // always looks conducted even at idle; the SWEEP RATE rises with the
-    // eased mid level, so a busy passage visibly cues faster and a calm
-    // one drifts slow. We accumulate phase by rate*delta (frame-rate
-    // independent, and continuous when rate changes), then:
-    //   angle = swing*sin(phase) + a slow off-ratio 2nd harmonic so the
-    //           gesture never feels metronomic.
-    //   dir   = (cos angle, sin angle), eased toward + renormalized so it
-    //           turns smoothly and never snaps or de-normalizes.
-    // dt is clamped so a long stall (backgrounded tab resuming) can't
-    // fling the phase forward in one step.
+    // ---- AUTO-CONDUCTOR LFO ---- the baton sweeps the heading on its own; the
+    // sweep rate rises with eased mid so a busy passage cues faster. Phase
+    // accumulated by rate*delta (frame-rate independent, continuous on rate
+    // change). dt clamped so a resuming backgrounded tab can't fling it.
     const dt = Math.min(delta, 0.05);
-    const BASE_RATE = 0.22;          // idle sweep speed (rad/s of phase)
-    const RATE_GAIN = 1.1;           // how much mid energy speeds the baton
-    const MAX_RATE = 1.4;            // clamp so loud passages never strobe
-    const SWING = 1.05;              // ±60° — gestures left<->right, never spins
+    const BASE_RATE = 0.22;
+    const RATE_GAIN = 1.1;
+    const MAX_RATE = 1.4;
+    const SWING = 1.05;
     const rate = Math.min(BASE_RATE + ampMid.current * RATE_GAIN, MAX_RATE);
     condPhase.current += rate * dt;
     const angle =
@@ -651,28 +475,16 @@ export function Terrain() {
       SWING * 0.3 * Math.sin(condPhase.current * 0.37 + 1.1);
     const tx = Math.cos(angle);
     const ty = Math.sin(angle);
-    // Ease toward the target heading (smooth turn), then renormalize.
     const dir = condDir.current;
     dir.x += (tx - dir.x) * 0.06;
     dir.y += (ty - dir.y) * 0.06;
     const len = Math.hypot(dir.x, dir.y) || 1;
     dir.x /= len;
     dir.y /= len;
-    (u.uDir.value as THREE.Vector2).set(dir.x, dir.y);
+    u.uDir.value.set(dir.x, dir.y);
 
-    // ---- RADIAL PULSE TRIGGER ----
-    // Three ways to launch the expanding ring:
-    //   1. A real NOTE ONSET — Meyda's spectral-energy-rise feature
-    //      (levels.onset) spiked, i.e. an actual attack in the music. This is
-    //      the *musical* trigger: it fires on note hits, not just loudness, so a
-    //      soft legato piano still ripples on its phrasing rather than only on
-    //      bass swells.
-    //   2. A bass surge — the older loudness heuristic, kept as a fallback for
-    //      material where the onset feature is quiet (and for the mic path,
-    //      which has no Meyda extraction).
-    //   3. A MANUAL pluck — a console button bumped levels.pulse while no audio
-    //      is playing, so a click ripples the surface itself.
-    // Fires only when no ring is already in flight, so one hit = one clean ring.
+    // ---- RADIAL PULSE TRIGGER ---- note onset (Meyda), bass surge fallback,
+    // or a manual console pluck launches one expanding ring at a time.
     const bassNow = levels.current.bass;
     const noteOnset = levels.current.onset > 0.22;
     const bassSurge = bassNow - prevBass.current > 0.18 && bassNow > 0.35;
@@ -685,8 +497,7 @@ export function Terrain() {
     }
     prevBass.current = bassNow;
     if (pulseActive.current) {
-      // Advance the ring. ~1.4s to fully expand and fade, then disarm.
-      pulse.current += 0.012;
+      pulse.current += 0.012; // ~1.4s to expand + fade, then disarm
       if (pulse.current >= 1) {
         pulse.current = 0;
         pulseActive.current = false;
@@ -697,25 +508,14 @@ export function Terrain() {
 
   return (
     <mesh
-      ref={meshRef}
       geometry={geometry}
-      // PlaneGeometry is XY-aligned by default; rotate -90° around X
-      // so it lies flat on the XZ ground plane with local-Y pointing
-      // forward (into the scene). The vertex shader writes Z, which
-      // after this rotation becomes world-up.
+      material={material}
+      // PlaneGeometry is XY-aligned; rotate -90° around X so it lies flat on
+      // the XZ ground plane with local-Y forward. The vertex node writes Z,
+      // which after this rotation becomes world-up.
       rotation={[-Math.PI / 2, 0, 0]}
       position={[0, 0, 0]}
       frustumCulled={false}
-    >
-      <shaderMaterial
-        ref={matRef}
-        vertexShader={vertexShader}
-        fragmentShader={fragmentShader}
-        uniforms={uniforms}
-        transparent
-        depthWrite={false}
-        side={THREE.FrontSide}
-      />
-    </mesh>
+    />
   );
 }
